@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "techverse-client-os"
+version = "2.0.0"
+description = "TechVerse AI Client Acquisition Operating System"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Sahil", email = "sahil@techverse.ai" }
+]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests", "services/api/tests", "services/worker/tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
