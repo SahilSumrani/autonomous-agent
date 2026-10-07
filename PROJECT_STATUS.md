@@ -35,18 +35,19 @@
 ## 3. Milestones & Implementation Roadmap
 
 - [x] **Repository Audit & Baseline**: Fresh monorepo initialization, git setup, .gitignore.
-- [ ] **Phase 0 — Foundation** (In Progress):
-  - [x] Python virtual environment & core dependencies
-  - [ ] Monorepo directory structure
-  - [ ] Environment configuration (`packages/config`, `.env.example`)
-  - [ ] Structured logging (`services/api/app/core/logging.py`)
-  - [ ] Database connection & session management (Async SQLAlchemy + asyncpg)
-  - [ ] Redis connection pool & health ping
-  - [ ] FastAPI application skeleton with `/health` and `/api/v1` router
-  - [ ] Docker Compose (`docker-compose.yml`) for PostgreSQL & Redis
-  - [ ] Alembic migration initialization
-  - [ ] Unit & integration test scaffolding (`pytest`, `pytest-asyncio`, `httpx`)
-- [ ] **Phase 1 — CRM Core**:
+- [x] **Phase 0 — Foundation** (Completed):
+  - [x] Python virtual environment & core dependencies (Python 3.14 + FastAPI + asyncpg + SQLAlchemy 2.0)
+  - [x] Monorepo directory structure
+  - [x] Environment configuration (`packages/config/settings.py`, `.env.example`, `.env`)
+  - [x] Structured logging (`services/api/app/core/logging.py`) with sensitive key redaction
+  - [x] Database connection & session management (Async SQLAlchemy + asyncpg)
+  - [x] Redis connection pool & health ping
+  - [x] FastAPI application skeleton with `/health` and `/api/v1` router
+  - [x] Request context & latency tracking middleware (`X-Request-ID`, `X-Process-Time-Ms`)
+  - [x] Docker Compose (`docker-compose.yml`) for PostgreSQL 16 & Redis 7
+  - [x] Async Alembic migration initialization (`alembic.ini`, `database/migrations/env.py`)
+  - [x] Unit & integration test scaffolding (`tests/test_config.py`, `tests/test_health.py` — 7 passed)
+- [ ] **Phase 1 — CRM Core** (Next Milestone):
   - [ ] Organizations, Users, Companies, Contacts, Leads, Lead Sources, Pipeline Events
   - [ ] Normalization & deduplication hierarchy (domain, email, URL)
   - [ ] CRUD, filtering, pagination, unit tests
