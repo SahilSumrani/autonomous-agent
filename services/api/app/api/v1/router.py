@@ -8,6 +8,7 @@ from services.api.app.api.v1.routes import (
     leads,
     outreach,
     research,
+    conversations,
 )
 
 api_v1_router = APIRouter()
@@ -29,4 +30,7 @@ api_v1_router.include_router(research.router)
 
 # Outreach Intelligence & Approvals
 api_v1_router.include_router(outreach.router)
+
+# Conversation Intelligence & Reply Agent
+api_v1_router.include_router(conversations.router)
 

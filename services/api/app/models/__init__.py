@@ -27,6 +27,13 @@ from services.api.app.models.research import (
     WebsiteResearch,
 )
 
+from services.api.app.models.conversation import (
+    ConversationApproval,
+    ConversationMessage,
+    ConversationReplyDraft,
+    ConversationThread,
+)
+
 __all__ = [
     "Organization",
     "User",
@@ -47,4 +54,8 @@ __all__ = [
     "OutreachEvidence",
     "OutreachApproval",
     "OutreachAttempt",
+    "ConversationThread",
+    "ConversationMessage",
+    "ConversationReplyDraft",
+    "ConversationApproval",
 ]
