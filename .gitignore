@@ -61,3 +61,6 @@ $RECYCLE.BIN/
 *.sqlite3
 postgres_data/
 redis_data/
+
+# e2e Runner Output & Cache
+.e2e/

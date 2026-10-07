@@ -3,12 +3,26 @@ from packages.config.settings import Settings
 
 
 def test_settings_default_values():
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert settings.APP_NAME == "TechVerse AI Client Acquisition OS"
     assert settings.API_V1_STR == "/api/v1"
     assert settings.PORT == 8000
     assert settings.AI_PROVIDER == "ollama"
     assert settings.SSRF_PROTECTION_ENABLED is True
+
+
+def test_groq_settings_configuration():
+    settings = Settings(
+        _env_file=None,
+        AI_PROVIDER="groq",
+        GROQ_API_KEY="test_key_sample",
+        GROQ_MODEL="openai/gpt-oss-120b",
+        GROQ_TIMEOUT_SECONDS=45.0,
+    )
+    assert settings.AI_PROVIDER == "groq"
+    assert settings.GROQ_API_KEY == "test_key_sample"
+    assert settings.GROQ_MODEL == "openai/gpt-oss-120b"
+    assert settings.GROQ_TIMEOUT_SECONDS == 45.0
 
 
 def test_database_url_assembly():

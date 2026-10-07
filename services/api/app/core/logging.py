@@ -6,7 +6,7 @@ from packages.config.settings import settings
 
 
 SENSITIVE_KEYS = {
-    "password", "secret", "token", "api_key", "authorization", 
+    "password", "secret", "token", "api_key", "groq_api_key", "authorization", 
     "hunter_api_key", "cookie", "session_id", "access_token"
 }
 

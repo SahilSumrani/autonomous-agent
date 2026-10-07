@@ -61,10 +61,14 @@ class Settings(BaseSettings):
         db = data.get("REDIS_DB", 0)
         return f"redis://{host}:{port}/{db}"
 
-    # AI Configuration (Local-first)
-    AI_PROVIDER: Literal["ollama", "openai", "gemini", "anthropic"] = "ollama"
+    # AI Configuration (Local-first & Cloud Fast Inference)
+    AI_PROVIDER: Literal["ollama", "groq", "openai", "gemini", "anthropic"] = "ollama"
+    AI_FALLBACK_PROVIDER: Optional[str] = "ollama"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "mistral"
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_TIMEOUT_SECONDS: float = 30.0
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None

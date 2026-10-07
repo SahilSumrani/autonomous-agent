@@ -29,7 +29,7 @@
 | **Database** | PostgreSQL 16 with UUID PKs, Alembic migrations | Completed (Phase 0/1/2/3/4/5) | Migrations 0001-0005 covering CRM, Agent, Score History, Research, and Outreach |
 | **Cache & Event Bus** | Redis 7+ for queueing, pub/sub, SSE/WebSocket streams | Completed (Phase 0/3/4/5) | Event Dispatcher with Redis pub/sub channels |
 | **Worker System** | Redis-backed job processor with retries, backoff, idempotency | Planned (Phase 0/1) | Scaffolding worker service & job contracts |
-| **AI Abstraction** | Provider protocol (`Ollama`, `OpenAI`, `Gemini`, `Anthropic`) | Planned (Phase 7) | Protocol interface in `packages/agent-core` |
+| **AI Abstraction** | Provider protocol (`Groq`, `Ollama`, `OpenAI`, `Gemini`, `Anthropic`) | Completed | `services/api/app/providers/ai/` with GroqCloud cloud inference & Ollama fallback |
 | **CRM Core** | 23+ normalized tables (Leads, Companies, Contacts, Signals) | Completed (Phase 1) | Models & migration schemas |
 | **Discovery System** | Multi-source providers (Instagram, Reddit, Web, Search) | Completed (Phase 2) | User-authorized browser research session |
 | **Signal Engine** | 18 intent signal types with confidence & evidence | Completed (Phase 3) | Signal schemas & heuristic/LLM detectors |
