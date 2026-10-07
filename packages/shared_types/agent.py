@@ -1,0 +1,55 @@
+from enum import Enum
+
+
+class SessionStatus(str, Enum):
+    IDLE = "IDLE"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    WAITING_FOR_USER = "WAITING_FOR_USER"
+    BLOCKED = "BLOCKED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class AgentState(str, Enum):
+    IDLE = "IDLE"
+    OBSERVING = "OBSERVING"
+    RESEARCHING = "RESEARCHING"
+    EVALUATING = "EVALUATING"
+    LEAD_FOUND = "LEAD_FOUND"
+    RESEARCHING_PROFILE = "RESEARCHING_PROFILE"
+    GENERATING_ACTION = "GENERATING_ACTION"
+    WAITING_FOR_APPROVAL = "WAITING_FOR_APPROVAL"
+    EXECUTING = "EXECUTING"
+    COMPLETED = "COMPLETED"
+    PAUSED = "PAUSED"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"
+
+
+class ActionType(str, Enum):
+    COMMENT = "COMMENT"
+    DM = "DM"
+    EMAIL = "EMAIL"
+    OTHER = "OTHER"
+
+
+class ApprovalStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+    EXECUTED = "EXECUTED"
+    FAILED = "FAILED"
+
+
+class ToolRiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class ToolPermissionLevel(str, Enum):
+    READ_ONLY = "READ_ONLY"
+    USER_INTERACTION = "USER_INTERACTION"
+    SENSITIVE_ACTION = "SENSITIVE_ACTION"

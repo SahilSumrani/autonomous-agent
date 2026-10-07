@@ -57,8 +57,18 @@
   - [x] Pydantic v2 schemas (`services/api/app/schemas/crm.py`) with pagination and validation
   - [x] REST APIs (`services/api/app/api/v1/routes/`): Leads, Companies, Contacts, Signals, Pipeline
   - [x] Unit & integration test suite (`tests/` — 23/23 tests passing)
-- [ ] **Phase 2 — Discovery Engine** (Next Recommended Milestone)
-- [ ] **Phase 3 — Signal Engine**
+- [x] **Phase 2 — User-Authorized Browser Research Agent** (Completed):
+  - [x] Agent session, event, and action approval models (`AgentSession`, `AgentEvent`, `ActionApproval`)
+  - [x] Migration (`0002_browser_agent_tables.py`) with foreign keys and multi-tenant indexes
+  - [x] Browser Tool Registry (`packages/agent_core/tools.py`) with risk levels, permissions, and validation
+  - [x] Operational state machine (`services/api/app/agents/browser/state_machine.py`) with pause/resume/block controls
+  - [x] Opportunity Detector (`services/api/app/agents/discovery/opportunity_detector.py`) with intent detection
+  - [x] Personalized draft generator (`services/api/app/agents/personalization/draft_generator.py`)
+  - [x] Duplicate contact protection preventing repeated outreach to same recipient
+  - [x] Human-in-the-loop action approval workflow (Pending -> Approved/Rejected -> Executed)
+  - [x] Agent Gateway API (`services/api/app/api/v1/routes/agent.py`) for extension integration
+  - [x] Unit & integration tests (`tests/test_browser_agent.py` — 31/31 tests passing across test suite)
+- [ ] **Phase 3 — Signal Engine & Scoring** (Next Recommended Milestone)
 - [ ] **Phase 4 — Website Intelligence (SSRF-protected deterministic audits)**
 - [ ] **Phase 5 — Research Agent**
 - [ ] **Phase 6 — Lead Scoring Engine (0-100 breakdown)**
