@@ -96,3 +96,36 @@ VALID_STATUS_TRANSITIONS: dict[LeadStatus, set[LeadStatus]] = {
     LeadStatus.WON: set(),
     LeadStatus.LOST: {LeadStatus.NEW, LeadStatus.QUALIFIED},  # Allow reactivation
 }
+
+
+class ScoreCategory(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    GOOD = "GOOD"
+    HIGH = "HIGH"
+    HOT = "HOT"
+
+
+class TechVerseService(str, Enum):
+    LANDING_PAGE = "LANDING_PAGE"
+    BUSINESS_WEBSITE = "BUSINESS_WEBSITE"
+    PREMIUM_WEBSITE = "PREMIUM_WEBSITE"
+    ECOMMERCE = "ECOMMERCE"
+    WEB_APP = "WEB_APP"
+    MOBILE_APP = "MOBILE_APP"
+    AI_AUTOMATION = "AI_AUTOMATION"
+    CUSTOM_AI_PRODUCT = "CUSTOM_AI_PRODUCT"
+    WEBSITE_REDESIGN = "WEBSITE_REDESIGN"
+    SEO = "SEO"
+    PERFORMANCE_OPTIMIZATION = "PERFORMANCE_OPTIMIZATION"
+
+
+class NextAction(str, Enum):
+    IGNORE = "IGNORE"
+    MONITOR = "MONITOR"
+    RESEARCH_MORE = "RESEARCH_MORE"
+    PREPARE_OUTREACH = "PREPARE_OUTREACH"
+    REQUEST_APPROVAL = "REQUEST_APPROVAL"
+    FOLLOW_UP = "FOLLOW_UP"
+    MEETING = "MEETING"
+

@@ -8,13 +8,19 @@ from services.api.app.api.v1.dependencies.auth import get_current_org_id
 from services.api.app.core.database import get_db
 from services.api.app.schemas.crm import (
     LeadCreate,
+    LeadQualificationResponse,
     LeadResponse,
+    LeadScoreHistoryResponse,
+    LeadScoreResponse,
     LeadSignalCreate,
     LeadSignalResponse,
     LeadStatusUpdate,
     LeadUpdate,
     PaginatedResponse,
     PipelineEventResponse,
+    ServiceMatchResponse,
+    SignalAnalysisRequest,
+    SignalAnalysisResponse,
 )
 from services.api.app.services.crm_service import (
     DuplicateEntityException,
@@ -179,3 +185,138 @@ async def add_lead_signal(
         return LeadSignalResponse.model_validate(signal)
     except EntityNotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/{lead_id}/signals/analyze", response_model=SignalAnalysisResponse)
+async def analyze_lead_signals(
+    lead_id: uuid.UUID,
+    data: SignalAnalysisRequest,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> SignalAnalysisResponse:
+    service = LeadService(db)
+    try:
+        signals, _ = await service.analyze_signals(
+            org_id=org_id,
+            lead_id=lead_id,
+            text=data.text,
+            source_url=data.source_url,
+            profile_bio=data.profile_bio,
+            website_text=data.website_text,
+        )
+        return SignalAnalysisResponse(
+            signals_detected=len(signals),
+            signals=[LeadSignalResponse.model_validate(s) for s in signals],
+        )
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/{lead_id}/score", response_model=LeadScoreResponse)
+async def score_lead(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> LeadScoreResponse:
+    service = LeadService(db)
+    try:
+        lead, qual = await service.score_lead(org_id=org_id, lead_id=lead_id)
+        return LeadScoreResponse(
+            lead_id=lead.id,
+            overall_score=qual.overall_score,
+            category=qual.category.value,
+            score_breakdown=qual.score_breakdown.model_dump(),
+            score_reasons=qual.score_reasons,
+            positive_factors=qual.positive_factors,
+            negative_factors=qual.negative_factors,
+            recommended_service=qual.recommended_service.value if qual.recommended_service else "BUSINESS_WEBSITE",
+            recommended_next_action=qual.recommended_next_action.value,
+        )
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{lead_id}/score", response_model=LeadScoreResponse)
+async def get_lead_score(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> LeadScoreResponse:
+    service = LeadService(db)
+    try:
+        qual = await service.get_lead_qualification(org_id=org_id, lead_id=lead_id)
+        return LeadScoreResponse(
+            lead_id=lead_id,
+            overall_score=qual.overall_score,
+            category=qual.category.value,
+            score_breakdown=qual.score_breakdown.model_dump(),
+            score_reasons=qual.score_reasons,
+            positive_factors=qual.positive_factors,
+            negative_factors=qual.negative_factors,
+            recommended_service=qual.recommended_service.value if qual.recommended_service else "BUSINESS_WEBSITE",
+            recommended_next_action=qual.recommended_next_action.value,
+        )
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{lead_id}/score/history", response_model=List[LeadScoreHistoryResponse])
+async def get_lead_score_history(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> List[LeadScoreHistoryResponse]:
+    service = LeadService(db)
+    try:
+        history = await service.get_score_history(org_id=org_id, lead_id=lead_id)
+        return [LeadScoreHistoryResponse.model_validate(h) for h in history]
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{lead_id}/qualification", response_model=LeadQualificationResponse)
+async def get_lead_qualification(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> LeadQualificationResponse:
+    service = LeadService(db)
+    try:
+        qual = await service.get_lead_qualification(org_id=org_id, lead_id=lead_id)
+        return LeadQualificationResponse(
+            lead_id=lead_id,
+            qualified=qual.qualified,
+            overall_score=qual.overall_score,
+            category=qual.category.value,
+            score_breakdown=qual.score_breakdown.model_dump(),
+            score_reasons=qual.score_reasons,
+            positive_factors=qual.positive_factors,
+            negative_factors=qual.negative_factors,
+            recommended_service=qual.recommended_service.value if qual.recommended_service else "BUSINESS_WEBSITE",
+            alternative_services=[s.value for s in qual.alternative_services],
+            recommended_next_action=qual.recommended_next_action.value,
+            confidence=qual.confidence,
+        )
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{lead_id}/service-match", response_model=ServiceMatchResponse)
+async def get_lead_service_match(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> ServiceMatchResponse:
+    service = LeadService(db)
+    try:
+        match_res = await service.get_service_match(org_id=org_id, lead_id=lead_id)
+        return ServiceMatchResponse(
+            lead_id=lead_id,
+            recommended_service=match_res.recommended_service.value,
+            alternative_services=[s.value for s in match_res.alternative_services],
+            confidence=match_res.confidence,
+            reason=match_res.reason,
+        )
+    except EntityNotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+

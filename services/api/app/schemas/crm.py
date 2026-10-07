@@ -271,3 +271,64 @@ class PipelineEventResponse(BaseModel):
     metadata_json: Optional[Dict[str, Any]] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- LeadScoreHistory ---
+class LeadScoreHistoryResponse(BaseModel):
+    id: uuid.UUID
+    lead_id: uuid.UUID
+    previous_score: int
+    new_score: int
+    breakdown_json: Dict[str, Any]
+    reason: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Signal & Qualification Endpoints ---
+class SignalAnalysisRequest(BaseModel):
+    text: str = Field(..., min_length=1, description="Raw visible content or post text")
+    source_url: Optional[str] = None
+    profile_bio: Optional[str] = None
+    website_text: Optional[str] = None
+
+
+class SignalAnalysisResponse(BaseModel):
+    signals_detected: int
+    signals: List[LeadSignalResponse]
+
+
+class LeadScoreResponse(BaseModel):
+    lead_id: uuid.UUID
+    overall_score: int
+    category: str
+    score_breakdown: Dict[str, Any]
+    score_reasons: List[str]
+    positive_factors: List[str]
+    negative_factors: List[str]
+    recommended_service: str
+    recommended_next_action: str
+
+
+class LeadQualificationResponse(BaseModel):
+    lead_id: uuid.UUID
+    qualified: bool
+    overall_score: int
+    category: str
+    score_breakdown: Dict[str, Any]
+    score_reasons: List[str]
+    positive_factors: List[str]
+    negative_factors: List[str]
+    recommended_service: str
+    alternative_services: List[str]
+    recommended_next_action: str
+    confidence: float
+
+
+class ServiceMatchResponse(BaseModel):
+    lead_id: uuid.UUID
+    recommended_service: str
+    alternative_services: List[str]
+    confidence: float
+    reason: str
+

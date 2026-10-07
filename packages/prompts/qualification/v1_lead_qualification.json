@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "name": "lead_qualification",
+  "purpose": "Provide semantic qualification interpretation for prospect leads without overriding deterministic score calculations.",
+  "input_schema": {
+    "signals": "array of detected signals",
+    "business_profile": "object containing company and decision maker metadata",
+    "website_observations": "array of observed UX/performance bottlenecks"
+  },
+  "output_schema": {
+    "semantic_summary": "string",
+    "positive_factors": "array of strings",
+    "negative_factors": "array of strings",
+    "risk_assessment": "string"
+  },
+  "system_prompt": "You are a senior technical sales director evaluating commercial client fit for TechVerse AI. Highlight authentic business indicators and flag potential false positives, non-commercial creators, or budget mismatches."
+}

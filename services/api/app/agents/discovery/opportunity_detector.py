@@ -45,14 +45,14 @@ INTENT_PATTERNS = [
         "intent": "Operational AI workflow automation interest",
     },
     {
-        "pattern": r"\b(launching|starting|opening)\s+(a|my|our)?\s*(clothing|brand|store|ecommerce|business|startup|shop)\b",
+        "pattern": r"\b(launching|starting|opening)\s+(a|my|our)?\s*([a-z]+\s+)*(clothing|brand|store|ecommerce|business|startup|shop|boutique)\b",
         "type": "BUSINESS_LAUNCH",
         "service": "E-commerce Website",
         "confidence": 0.88,
         "intent": "New venture launch requiring digital storefront",
     },
     {
-        "pattern": r"\b(figure out|set up|need)\s+(an?\s+)?(online store|ecommerce|shopify|checkout)\b",
+        "pattern": r"\b(figure out|set up|need|build|looking for)\s+(an?\s+)?([a-z]+\s+)*(online store|ecommerce|shopify|checkout|storefront)\b",
         "type": "ECOMMERCE_OPPORTUNITY",
         "service": "E-commerce Website",
         "confidence": 0.90,

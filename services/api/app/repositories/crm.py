@@ -7,6 +7,7 @@ from services.api.app.models.crm import (
     Company,
     Contact,
     Lead,
+    LeadScoreHistory,
     LeadSignal,
     LeadSource,
     Organization,
@@ -270,5 +271,20 @@ class PipelineEventRepository:
 
     async def list_by_lead(self, lead_id: uuid.UUID) -> List[PipelineEvent]:
         stmt = select(PipelineEvent).where(PipelineEvent.lead_id == lead_id).order_by(desc(PipelineEvent.created_at))
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+
+class LeadScoreHistoryRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, history: LeadScoreHistory) -> LeadScoreHistory:
+        self.session.add(history)
+        await self.session.flush()
+        return history
+
+    async def list_by_lead(self, lead_id: uuid.UUID) -> List[LeadScoreHistory]:
+        stmt = select(LeadScoreHistory).where(LeadScoreHistory.lead_id == lead_id).order_by(desc(LeadScoreHistory.created_at))
         res = await self.session.execute(stmt)
         return list(res.scalars().all())

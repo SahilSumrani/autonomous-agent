@@ -80,6 +80,11 @@ class PageObservationResponse(BaseModel):
     draft_content: Optional[str] = None
     approval_status: Optional[str] = None
     message: Optional[str] = None
+    overall_score: Optional[int] = None
+    category: Optional[str] = None
+    score_breakdown: Optional[Dict[str, Any]] = None
+    recommended_service: Optional[str] = None
+    recommended_next_action: Optional[str] = None
 
 
 class ActionApprovalResponse(BaseModel):

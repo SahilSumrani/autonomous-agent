@@ -7,12 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.shared_types.crm import (
     ActorType,
     LeadStatus,
+    ScoreCategory,
+    SignalType,
     VALID_STATUS_TRANSITIONS,
 )
 from services.api.app.models.crm import (
     Company,
     Contact,
     Lead,
+    LeadScoreHistory,
     LeadSignal,
     LeadSource,
     Organization,
@@ -22,11 +25,16 @@ from services.api.app.repositories.crm import (
     CompanyRepository,
     ContactRepository,
     LeadRepository,
+    LeadScoreHistoryRepository,
     LeadSignalRepository,
     LeadSourceRepository,
     OrganizationRepository,
     PipelineEventRepository,
 )
+from services.api.app.agents.signals.engine import SignalDetectionEngine
+from services.api.app.services.lead_scoring import LeadScoringEngine, LeadQualification
+from services.api.app.services.service_matching import ServiceMatchingEngine, ServiceMatchResult
+from services.api.app.services.event_dispatcher import EventDispatcher
 from services.api.app.schemas.crm import (
     CompanyCreate,
     CompanyUpdate,
@@ -259,6 +267,7 @@ class LeadService:
         self.repo = LeadRepository(session)
         self.signal_repo = LeadSignalRepository(session)
         self.event_repo = PipelineEventRepository(session)
+        self.score_history_repo = LeadScoreHistoryRepository(session)
 
     async def create_lead(self, data: LeadCreate) -> Lead:
         norm_profile = normalize_profile_url(data.profile_url)
@@ -433,3 +442,276 @@ class LeadService:
         # Validate lead belongs to org
         await self.get_lead(org_id, lead_id)
         return await self.event_repo.list_by_lead(lead_id)
+
+    async def analyze_signals(
+        self,
+        org_id: uuid.UUID,
+        lead_id: uuid.UUID,
+        text: str,
+        source_url: Optional[str] = None,
+        profile_bio: Optional[str] = None,
+        website_text: Optional[str] = None,
+    ) -> Tuple[List[LeadSignal], LeadQualification]:
+        lead = await self.get_lead(org_id, lead_id)
+
+        # 1. Detect candidate signals
+        detected = SignalDetectionEngine.analyze(
+            text=text,
+            source_url=source_url or lead.source_url,
+            profile_bio=profile_bio,
+            website_text=website_text,
+        )
+
+        # 2. Deduplicate against existing signals for this lead
+        existing_signals = await self.signal_repo.list_by_lead(lead_id)
+        existing_keys = {
+            (s.signal_type, (s.evidence or "").strip().lower()[:60])
+            for s in existing_signals
+        }
+
+        new_signals = []
+        for det in detected:
+            key = (det.signal_type.value, (det.evidence or "").strip().lower()[:60])
+            if key not in existing_keys:
+                sig = LeadSignal(
+                    lead_id=lead.id,
+                    signal_type=det.signal_type.value,
+                    confidence=det.confidence,
+                    evidence=det.evidence,
+                    source_url=det.source_url,
+                    detected_at=det.detected_at,
+                )
+                created_sig = await self.signal_repo.create(sig)
+                new_signals.append(created_sig)
+                existing_keys.add(key)
+
+                await EventDispatcher.emit(
+                    "lead.signal.detected",
+                    org_id=org_id,
+                    lead_id=lead.id,
+                    payload={
+                        "signal_type": det.signal_type.value,
+                        "confidence": det.confidence,
+                        "evidence": det.evidence,
+                        "source_url": det.source_url,
+                    },
+                )
+
+        # 3. Recalculate score & qualification
+        all_signals = await self.signal_repo.list_by_lead(lead_id)
+        from services.api.app.agents.signals.engine import DetectedSignal
+        converted_signals = [
+            DetectedSignal(
+                signal_type=SignalType(s.signal_type),
+                confidence=s.confidence,
+                evidence=s.evidence or "",
+                source_url=s.source_url,
+                detected_at=s.detected_at,
+            )
+            for s in all_signals
+            if s.signal_type in SignalType.__members__
+        ]
+
+        combined_text = f"{lead.title or ''} {lead.summary or ''} {text} {profile_bio or ''}"
+        has_site = bool(lead.source_url or website_text)
+        qualification = LeadScoringEngine.evaluate_lead(
+            lead_id=lead.id,
+            signals=converted_signals,
+            text_corpus=combined_text,
+            profile_bio=profile_bio,
+            has_website=has_site,
+        )
+
+        # 4. Record score history
+        prev_score = lead.overall_score or 0
+        lead.overall_score = qualification.overall_score
+        lead.intent_score = qualification.score_breakdown.buying_intent
+        lead.qualification_score = qualification.overall_score
+        if qualification.recommended_service:
+            lead.recommended_service = qualification.recommended_service.value
+
+        score_entry = LeadScoreHistory(
+            lead_id=lead.id,
+            previous_score=prev_score,
+            new_score=qualification.overall_score,
+            breakdown_json=qualification.score_breakdown.model_dump(),
+            reason=f"Signals analyzed: {len(new_signals)} new signals detected",
+        )
+        await self.score_history_repo.create(score_entry)
+
+        # 5. Emit real-time events
+        await EventDispatcher.emit(
+            "lead.score.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "previous_score": prev_score,
+                "overall_score": qualification.overall_score,
+                "category": qualification.category.value,
+                "breakdown": qualification.score_breakdown.model_dump(),
+            },
+        )
+        if qualification.recommended_service:
+            await EventDispatcher.emit(
+                "lead.service.matched",
+                org_id=org_id,
+                lead_id=lead.id,
+                payload={
+                    "recommended_service": qualification.recommended_service.value,
+                    "alternative_services": [s.value for s in qualification.alternative_services],
+                },
+            )
+        await EventDispatcher.emit(
+            "lead.qualification.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "qualified": qualification.qualified,
+                "category": qualification.category.value,
+                "overall_score": qualification.overall_score,
+            },
+        )
+        await EventDispatcher.emit(
+            "lead.next_action.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "recommended_next_action": qualification.recommended_next_action.value,
+            },
+        )
+
+        await self.session.commit()
+        await self.session.refresh(lead)
+        return all_signals, qualification
+
+    async def score_lead(
+        self,
+        org_id: uuid.UUID,
+        lead_id: uuid.UUID,
+        reason: str = "Recalculated lead score",
+    ) -> Tuple[Lead, LeadQualification]:
+        lead = await self.get_lead(org_id, lead_id)
+        signals = await self.signal_repo.list_by_lead(lead_id)
+
+        from services.api.app.agents.signals.engine import DetectedSignal
+        converted_signals = [
+            DetectedSignal(
+                signal_type=SignalType(s.signal_type),
+                confidence=s.confidence,
+                evidence=s.evidence or "",
+                source_url=s.source_url,
+                detected_at=s.detected_at,
+            )
+            for s in signals
+            if s.signal_type in SignalType.__members__
+        ]
+
+        combined_text = f"{lead.title or ''} {lead.summary or ''}"
+        qualification = LeadScoringEngine.evaluate_lead(
+            lead_id=lead.id,
+            signals=converted_signals,
+            text_corpus=combined_text,
+            has_website=bool(lead.source_url),
+        )
+
+        prev_score = lead.overall_score or 0
+        lead.overall_score = qualification.overall_score
+        lead.intent_score = qualification.score_breakdown.buying_intent
+        lead.qualification_score = qualification.overall_score
+        if qualification.recommended_service:
+            lead.recommended_service = qualification.recommended_service.value
+
+        score_entry = LeadScoreHistory(
+            lead_id=lead.id,
+            previous_score=prev_score,
+            new_score=qualification.overall_score,
+            breakdown_json=qualification.score_breakdown.model_dump(),
+            reason=reason,
+        )
+        await self.score_history_repo.create(score_entry)
+
+        await EventDispatcher.emit(
+            "lead.score.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "previous_score": prev_score,
+                "overall_score": qualification.overall_score,
+                "category": qualification.category.value,
+                "breakdown": qualification.score_breakdown.model_dump(),
+            },
+        )
+        await EventDispatcher.emit(
+            "lead.qualification.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "qualified": qualification.qualified,
+                "category": qualification.category.value,
+                "overall_score": qualification.overall_score,
+            },
+        )
+        await EventDispatcher.emit(
+            "lead.next_action.updated",
+            org_id=org_id,
+            lead_id=lead.id,
+            payload={
+                "recommended_next_action": qualification.recommended_next_action.value,
+            },
+        )
+
+        await self.session.commit()
+        await self.session.refresh(lead)
+        return lead, qualification
+
+    async def get_score_history(self, org_id: uuid.UUID, lead_id: uuid.UUID) -> List[LeadScoreHistory]:
+        await self.get_lead(org_id, lead_id)
+        return await self.score_history_repo.list_by_lead(lead_id)
+
+    async def get_lead_qualification(self, org_id: uuid.UUID, lead_id: uuid.UUID) -> LeadQualification:
+        lead = await self.get_lead(org_id, lead_id)
+        signals = await self.signal_repo.list_by_lead(lead_id)
+
+        from services.api.app.agents.signals.engine import DetectedSignal
+        converted_signals = [
+            DetectedSignal(
+                signal_type=SignalType(s.signal_type),
+                confidence=s.confidence,
+                evidence=s.evidence or "",
+                source_url=s.source_url,
+                detected_at=s.detected_at,
+            )
+            for s in signals
+            if s.signal_type in SignalType.__members__
+        ]
+
+        combined_text = f"{lead.title or ''} {lead.summary or ''}"
+        return LeadScoringEngine.evaluate_lead(
+            lead_id=lead.id,
+            signals=converted_signals,
+            text_corpus=combined_text,
+            has_website=bool(lead.source_url),
+        )
+
+    async def get_service_match(self, org_id: uuid.UUID, lead_id: uuid.UUID) -> ServiceMatchResult:
+        lead = await self.get_lead(org_id, lead_id)
+        signals = await self.signal_repo.list_by_lead(lead_id)
+
+        from services.api.app.agents.signals.engine import DetectedSignal
+        converted_signals = [
+            DetectedSignal(
+                signal_type=SignalType(s.signal_type),
+                confidence=s.confidence,
+                evidence=s.evidence or "",
+                source_url=s.source_url,
+                detected_at=s.detected_at,
+            )
+            for s in signals
+            if s.signal_type in SignalType.__members__
+        ]
+
+        combined_text = f"{lead.title or ''} {lead.summary or ''}"
+        return ServiceMatchingEngine.match(
+            signals=converted_signals,
+            text=combined_text,
+        )

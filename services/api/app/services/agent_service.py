@@ -11,10 +11,11 @@ from packages.shared_types.agent import (
     ApprovalStatus,
     SessionStatus,
 )
-from packages.shared_types.crm import LeadType, SignalType
+from packages.shared_types.crm import LeadType, NextAction, ScoreCategory, SignalType
 from services.api.app.agents.browser.state_machine import BrowserAgentStateMachine
 from services.api.app.agents.discovery.opportunity_detector import OpportunityDetector
 from services.api.app.agents.personalization.draft_generator import DraftGenerator
+from services.api.app.agents.signals.engine import SignalDetectionEngine
 from services.api.app.models.agent import ActionApproval, AgentEvent, AgentSession
 from services.api.app.models.crm import Lead, LeadSignal
 from services.api.app.schemas.crm import LeadCreate, LeadSignalCreate
@@ -332,13 +333,26 @@ class AgentService:
             output_summary=visible_text[:200],
         )
 
-        # 2. Opportunity Detection
+        # 2. Opportunity & Signal Detection
         eval_result = OpportunityDetector.evaluate_content(text=visible_text)
-        if not eval_result.is_opportunity:
+        detected_signals = SignalDetectionEngine.analyze(text=visible_text, source_url=url)
+
+        if not eval_result.is_opportunity and not detected_signals:
             return {
                 "is_opportunity": False,
                 "message": "No high-intent opportunity detected on current page",
             }
+        elif not eval_result.is_opportunity and detected_signals:
+            primary_sig = detected_signals[0]
+            from services.api.app.agents.discovery.opportunity_detector import OpportunityEvaluation
+            eval_result = OpportunityEvaluation(
+                is_opportunity=True,
+                opportunity_type=primary_sig.signal_type.value,
+                confidence=primary_sig.confidence,
+                evidence=[primary_sig.evidence],
+                recommended_service="E-commerce Website" if primary_sig.signal_type == SignalType.ECOMMERCE_OPPORTUNITY else "Business Website",
+                detected_intent=primary_sig.evidence,
+            )
 
         # 3. CRM Lead Creation (if not already existing)
         clean_profile = normalize_profile_url(profile_url) or normalize_profile_url(url)
@@ -357,7 +371,7 @@ class AgentService:
                     recommended_service=eval_result.recommended_service,
                 )
             )
-            # Add buying signal
+            # Add initial signal from opportunity detector
             await self.lead_service.add_signal(
                 org_id=org_id,
                 data=LeadSignalCreate(
@@ -372,16 +386,34 @@ class AgentService:
             # If lead already exists or duplicate detected, fetch existing
             pass
 
-        # 4. Generate Personalized Outreach Draft
+        # 4. Phase 3 Signal Engine & Lead Qualification
+        qualification = None
+        if lead:
+            try:
+                _, qualification = await self.lead_service.analyze_signals(
+                    org_id=org_id,
+                    lead_id=lead.id,
+                    text=visible_text,
+                    source_url=url,
+                )
+            except Exception:
+                pass
+
+        # 5. Generate Personalized Outreach Draft
         handle = recipient_handle or "founder"
+        rec_service = (
+            qualification.recommended_service.value
+            if (qualification and qualification.recommended_service)
+            else (eval_result.recommended_service or "Business Website")
+        )
         dm_draft = DraftGenerator.generate_dm_draft(
             recipient_handle=handle,
             opportunity_type=eval_result.opportunity_type or "WEBSITE_REQUEST",
-            recommended_service=eval_result.recommended_service or "Business Website",
+            recommended_service=rec_service,
             observation=eval_result.evidence[0] if eval_result.evidence else None,
         )
 
-        # 5. Create Action Approval Gate
+        # 6. Create Action Approval Gate
         approval = await self.request_action_approval(
             org_id=org_id,
             session_id=session_id,
@@ -398,7 +430,12 @@ class AgentService:
             "opportunity_type": eval_result.opportunity_type,
             "confidence": eval_result.confidence,
             "lead_id": str(lead.id) if lead else None,
-            "approval_id": str(approval.id),
-            "draft_content": dm_draft.content,
-            "approval_status": approval.status,
+            "approval_id": str(approval.id) if approval else None,
+            "draft_content": dm_draft.content if dm_draft else None,
+            "approval_status": approval.status if approval else None,
+            "overall_score": qualification.overall_score if qualification else int(eval_result.confidence * 90),
+            "category": qualification.category.value if qualification else "GOOD",
+            "score_breakdown": qualification.score_breakdown.model_dump() if qualification else {},
+            "recommended_service": rec_service,
+            "recommended_next_action": qualification.recommended_next_action.value if qualification else "PREPARE_OUTREACH",
         }

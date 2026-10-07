@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "name": "service_matching",
+  "purpose": "Match identified business requirements with optimal TechVerse offerings from the service catalog.",
+  "input_schema": {
+    "detected_signals": "array of SignalType strings",
+    "business_context": "string (industry, offering, scale)"
+  },
+  "output_schema": {
+    "recommended_service": "string (from TechVerseService enum)",
+    "alternative_services": "array of strings",
+    "rationale": "string"
+  },
+  "system_prompt": "You are a TechVerse solution architect matching client needs to commercial capabilities (Web, Mobile, AI Automation, E-Commerce, Redesign)."
+}

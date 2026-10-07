@@ -224,6 +224,7 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     signals: Mapped[List["LeadSignal"]] = relationship("LeadSignal", back_populates="lead", cascade="all, delete-orphan")
     pipeline_events: Mapped[List["PipelineEvent"]] = relationship("PipelineEvent", back_populates="lead", cascade="all, delete-orphan")
+    score_history: Mapped[List["LeadScoreHistory"]] = relationship("LeadScoreHistory", back_populates="lead", cascade="all, delete-orphan", order_by="desc(LeadScoreHistory.created_at)")
 
     __table_args__ = (
         CheckConstraint("intent_score >= 0 AND intent_score <= 100", name="chk_lead_intent_score"),
@@ -278,3 +279,28 @@ class PipelineEvent(Base, UUIDPrimaryKeyMixin):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 
     lead: Mapped["Lead"] = relationship("Lead", back_populates="pipeline_events")
+
+
+class LeadScoreHistory(Base, UUIDPrimaryKeyMixin):
+    """Historical audit trail of lead scoring calculations and recalibrations."""
+    __tablename__ = "lead_score_history"
+
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("leads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    previous_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    new_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    breakdown_json: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    lead: Mapped["Lead"] = relationship("Lead", back_populates="score_history")
+
