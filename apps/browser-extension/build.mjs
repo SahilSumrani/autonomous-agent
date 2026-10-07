@@ -61,6 +61,50 @@ async function build() {
   );
   console.log("✓ Copied popup HTML & CSS");
 
+  // 5. Generate and validate dist/manifest.json from source manifest
+  const sourceManifestPath = path.join(__dirname, "manifest.json");
+  const rawManifest = fs.readFileSync(sourceManifestPath, "utf-8");
+  const manifest = JSON.parse(rawManifest);
+
+  // Normalize relative paths to be relative to dist root (strip leading "dist/")
+  const normalizePath = (p) => (typeof p === "string" ? p.replace(/^\.?\/?dist\//, "") : p);
+
+  if (manifest.background?.service_worker) {
+    manifest.background.service_worker = normalizePath(manifest.background.service_worker);
+  }
+  if (Array.isArray(manifest.content_scripts)) {
+    for (const cs of manifest.content_scripts) {
+      if (Array.isArray(cs.js)) {
+        cs.js = cs.js.map(normalizePath);
+      }
+      if (Array.isArray(cs.css)) {
+        cs.css = cs.css.map(normalizePath);
+      }
+    }
+  }
+  if (manifest.action?.default_popup) {
+    manifest.action.default_popup = normalizePath(manifest.action.default_popup);
+  }
+
+  // Validate that all referenced files exist in dist
+  const referencedFiles = [
+    manifest.background?.service_worker,
+    ...(manifest.content_scripts?.flatMap((cs) => cs.js || []) || []),
+    ...(manifest.content_scripts?.flatMap((cs) => cs.css || []) || []),
+    manifest.action?.default_popup,
+  ].filter(Boolean);
+
+  for (const relFile of referencedFiles) {
+    const fullPath = path.join(distDir, relFile);
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`Manifest references file not found in dist: ${relFile}`);
+    }
+  }
+
+  const distManifestPath = path.join(distDir, "manifest.json");
+  fs.writeFileSync(distManifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  console.log("✓ Generated dist/manifest.json");
+
   console.log("🎉 Extension build successful! Ready to unpack in Chrome.");
 }
 

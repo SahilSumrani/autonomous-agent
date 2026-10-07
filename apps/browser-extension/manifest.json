@@ -15,7 +15,7 @@
     "https://*.reddit.com/*"
   ],
   "background": {
-    "service_worker": "dist/background/service_worker.js",
+    "service_worker": "background/service_worker.js",
     "type": "module"
   },
   "content_scripts": [
@@ -31,12 +31,12 @@
         "*://127.0.0.1/*",
         "*://169.254.169.254/*"
       ],
-      "js": ["dist/content/content_script.js"],
+      "js": ["content/content_script.js"],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "dist/popup/popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "TechVerse AI Browser Agent"
   }
 }

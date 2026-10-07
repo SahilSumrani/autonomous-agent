@@ -23,7 +23,7 @@ from services.api.app.api.v1.dependencies.auth import get_current_org_id
 from services.api.app.core.database import get_db
 from services.api.app.models.agent import AgentEvent, AgentSession
 from services.api.app.models.outreach import OutreachApproval, OutreachAttempt, OutreachDraft
-from services.api.app.repositories.crm import CompanyRepository, ContactRepository, LeadRepository
+from services.api.app.repositories.crm import CompanyRepository, ContactRepository, LeadRepository, OrganizationRepository
 from services.api.app.repositories.outreach import OutreachRepository
 from services.api.app.schemas.browser_gateway import (
     BrowserStatusResponse,
@@ -34,7 +34,7 @@ from services.api.app.schemas.browser_gateway import (
     RevokeRequest,
     SessionControlRequest,
 )
-from services.api.app.services.agent_service import AgentService
+from services.api.app.services.agent_service import AgentService, AgentServiceException
 from services.api.app.services.event_dispatcher import EventDispatcher
 
 logger = logging.getLogger("techverse.api.routes.browser_gateway")
@@ -68,17 +68,33 @@ async def pair_browser_extension(
     org_id = pairing_info["organization_id"]
     user_id = pairing_info.get("user_id")
 
+    # Verify organization exists in the database
+    org_repo = OrganizationRepository(db)
+    org = await org_repo.get_by_id(org_id)
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organization {org_id} not found or unavailable",
+        )
+
     # If session_id provided, verify or create session
     session_id = data.session_id
     if not session_id:
-        agent_service = AgentService(db)
-        new_session = await agent_service.create_session(
-            org_id=org_id,
-            browser_id=data.browser_id,
-            user_id=user_id,
-            metadata={"client_version": data.client_version},
-        )
-        session_id = new_session.id
+        try:
+            agent_service = AgentService(db)
+            new_session = await agent_service.create_session(
+                org_id=org_id,
+                browser_id=data.browser_id,
+                user_id=user_id,
+                metadata={"client_version": data.client_version},
+            )
+            session_id = new_session.id
+        except Exception as e:
+            logger.error("Failed to create agent session during pairing", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to initialize browser session: {str(e)}",
+            )
     else:
         # Check session exists in organization
         stmt = select(AgentSession).where(
@@ -178,7 +194,13 @@ async def pause_browser_session(
 ) -> Dict[str, Any]:
     """Pause operations on the active browser agent session."""
     agent_service = AgentService(db)
-    sess = await agent_service.get_session(org_id, data.session_id)
+    try:
+        sess = await agent_service.get_session(org_id, data.session_id)
+    except AgentServiceException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {data.session_id} not found",
+        )
 
     sess.status = SessionStatus.PAUSED.value
     await db.commit()
@@ -208,7 +230,13 @@ async def resume_browser_session(
 ) -> Dict[str, Any]:
     """Resume operations on a paused browser session."""
     agent_service = AgentService(db)
-    sess = await agent_service.get_session(org_id, data.session_id)
+    try:
+        sess = await agent_service.get_session(org_id, data.session_id)
+    except AgentServiceException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {data.session_id} not found",
+        )
 
     sess.status = SessionStatus.RUNNING.value
     await db.commit()
@@ -237,7 +265,13 @@ async def stop_browser_session(
 ) -> Dict[str, Any]:
     """Stop browser session and cancel pending commands."""
     agent_service = AgentService(db)
-    sess = await agent_service.get_session(org_id, data.session_id)
+    try:
+        sess = await agent_service.get_session(org_id, data.session_id)
+    except AgentServiceException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {data.session_id} not found",
+        )
 
     sess.status = SessionStatus.COMPLETED.value
     await db.commit()

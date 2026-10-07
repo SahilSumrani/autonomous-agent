@@ -4,6 +4,8 @@ import * as esbuild from "esbuild";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
+import * as fs from "fs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test("Extension bundle and functionality test suite", async () => {
@@ -79,4 +81,56 @@ test("PageReader classifies URLs properly", async () => {
   assert.equal(PageReader.classifyPage("https://www.reddit.com/r/ecommerce/comments/xyz123/"), "REDDIT_POST");
   assert.equal(PageReader.classifyPage("https://www.reddit.com/user/john_doe/"), "REDDIT_PROFILE");
   assert.equal(PageReader.classifyPage("https://apexluxurywear.com/products"), "PUBLIC_WEBSITE");
+});
+
+test("Manifest V3 packaging, dist structure, and security validation", () => {
+  const distDir = path.join(__dirname, "../dist");
+  const manifestPath = path.join(distDir, "manifest.json");
+
+  assert.ok(fs.existsSync(manifestPath), "dist/manifest.json must exist after build");
+
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+
+  // Manifest V3 check
+  assert.equal(manifest.manifest_version, 3, "Manifest version must be 3");
+
+  // Security & permissions check: must remain minimal
+  const forbiddenPermissions = [
+    "cookies",
+    "webRequest",
+    "debugger",
+    "webRequestBlocking",
+    "proxy",
+    "management",
+    "<all_urls>",
+  ];
+
+  for (const perm of forbiddenPermissions) {
+    assert.ok(
+      !manifest.permissions?.includes(perm),
+      `Permission '${perm}' is forbidden for security`
+    );
+  }
+
+  // Verify referenced files exist inside dist/
+  const workerFile = path.join(distDir, manifest.background.service_worker);
+  assert.ok(
+    fs.existsSync(workerFile),
+    `Service worker file must exist: ${manifest.background.service_worker}`
+  );
+
+  for (const cs of manifest.content_scripts || []) {
+    for (const jsFile of cs.js || []) {
+      assert.ok(
+        fs.existsSync(path.join(distDir, jsFile)),
+        `Content script file must exist: ${jsFile}`
+      );
+    }
+  }
+
+  const popupFile = path.join(distDir, manifest.action.default_popup);
+  assert.ok(
+    fs.existsSync(popupFile),
+    `Popup file must exist: ${manifest.action.default_popup}`
+  );
 });

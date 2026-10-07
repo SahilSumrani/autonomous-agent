@@ -35,6 +35,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         redis_ready=redis_status,
     )
 
+    # Bootstrap deterministic development organization if in development/test
+    if db_status and settings.ENVIRONMENT in ("development", "test"):
+        try:
+            from database.seeds.dev_seed import seed_development_organization
+            dev_org = await seed_development_organization()
+            logger.info(
+                "Development Organization Bootstrapped",
+                org_id=str(dev_org.id),
+                org_slug=dev_org.slug,
+            )
+        except Exception as e:
+            logger.warning("Failed to bootstrap development organization", error=str(e))
+
     yield
 
     logger.info("Application Shutting Down")

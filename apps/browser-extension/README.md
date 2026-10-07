@@ -41,7 +41,7 @@ CRM + Human Approval Gate
 2. **Open Chrome**: Navigate to `chrome://extensions/`.
 3. Enable **Developer mode** (toggle in upper right corner).
 4. Click **Load unpacked**.
-5. Select the `apps/browser-extension/` directory (where `manifest.json` resides).
+5. Select the `apps/browser-extension/dist` directory (where `manifest.json` resides).
 6. The **TechVerse AI Browser Agent** icon will appear in your Chrome toolbar.
 
 ---
