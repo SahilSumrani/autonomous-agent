@@ -22,10 +22,40 @@ VALID_STATE_TRANSITIONS: Dict[AgentState, Set[AgentState]] = {
         AgentState.BLOCKED, AgentState.FAILED
     },
     AgentState.LEAD_FOUND: {
-        AgentState.RESEARCHING_PROFILE, AgentState.GENERATING_ACTION,
-        AgentState.PAUSED, AgentState.COMPLETED, AgentState.FAILED
+        AgentState.RESEARCHING_PROFILE, AgentState.RESOLVING_WEBSITE,
+        AgentState.GENERATING_ACTION, AgentState.PAUSED, AgentState.COMPLETED, AgentState.FAILED
     },
     AgentState.RESEARCHING_PROFILE: {
+        AgentState.RESOLVING_WEBSITE, AgentState.RESEARCHING_WEBSITE,
+        AgentState.GENERATING_ACTION, AgentState.COMPLETED,
+        AgentState.PAUSED, AgentState.FAILED
+    },
+    AgentState.RESOLVING_WEBSITE: {
+        AgentState.RESEARCHING_WEBSITE, AgentState.UPDATING_LEAD_INTELLIGENCE,
+        AgentState.GENERATING_ACTION, AgentState.BLOCKED, AgentState.PAUSED, AgentState.FAILED, AgentState.COMPLETED
+    },
+    AgentState.RESEARCHING_WEBSITE: {
+        AgentState.ANALYZING_PAGES, AgentState.DETECTING_TECHNOLOGY,
+        AgentState.AUDITING_WEBSITE, AgentState.CALCULATING_OPPORTUNITY,
+        AgentState.BLOCKED, AgentState.PAUSED, AgentState.FAILED, AgentState.COMPLETED
+    },
+    AgentState.ANALYZING_PAGES: {
+        AgentState.DETECTING_TECHNOLOGY, AgentState.AUDITING_WEBSITE,
+        AgentState.CALCULATING_OPPORTUNITY, AgentState.BLOCKED, AgentState.PAUSED, AgentState.FAILED, AgentState.COMPLETED
+    },
+    AgentState.DETECTING_TECHNOLOGY: {
+        AgentState.AUDITING_WEBSITE, AgentState.CALCULATING_OPPORTUNITY,
+        AgentState.BLOCKED, AgentState.PAUSED, AgentState.FAILED, AgentState.COMPLETED
+    },
+    AgentState.AUDITING_WEBSITE: {
+        AgentState.CALCULATING_OPPORTUNITY, AgentState.UPDATING_LEAD_INTELLIGENCE,
+        AgentState.BLOCKED, AgentState.PAUSED, AgentState.FAILED, AgentState.COMPLETED
+    },
+    AgentState.CALCULATING_OPPORTUNITY: {
+        AgentState.UPDATING_LEAD_INTELLIGENCE, AgentState.GENERATING_ACTION,
+        AgentState.COMPLETED, AgentState.PAUSED, AgentState.FAILED
+    },
+    AgentState.UPDATING_LEAD_INTELLIGENCE: {
         AgentState.GENERATING_ACTION, AgentState.COMPLETED,
         AgentState.PAUSED, AgentState.FAILED
     },

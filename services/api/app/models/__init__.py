@@ -15,6 +15,11 @@ from services.api.app.models.crm import (
     User,
 )
 
+from services.api.app.models.research import (
+    WebsitePageResearch,
+    WebsiteResearch,
+)
+
 __all__ = [
     "Organization",
     "User",
@@ -28,4 +33,6 @@ __all__ = [
     "AgentSession",
     "AgentEvent",
     "ActionApproval",
+    "WebsiteResearch",
+    "WebsitePageResearch",
 ]

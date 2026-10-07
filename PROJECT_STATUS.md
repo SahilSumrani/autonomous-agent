@@ -1,9 +1,9 @@
 # PROJECT_STATUS — TechVerse AI Client Acquisition OS V2
 
-**Current Phase**: Phase 3 — Signal Engine + Lead Scoring + Service Matching (COMPLETED)  
+**Current Phase**: Phase 4 — Website Intelligence + Deep Research Engine (COMPLETED)  
 **Last Updated**: 2026-10-07  
 **Owner / Engineer**: Sahil (Backend, AI, Agent Systems, Infrastructure)  
-**Verification**: 42/42 tests passing across Phase 0, Phase 1, Phase 2, and Phase 3
+**Verification**: 52/52 tests passing across Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4
 
 ---
 
@@ -21,15 +21,15 @@
 | Component | Target Specification | Current State | Gap / Action |
 | :--- | :--- | :--- | :--- |
 | **Monorepo Structure** | `apps/`, `services/api/`, `services/worker/`, `packages/`, `database/`, `infrastructure/`, `docs/` | In progress | Initializing full folder structure and package scaffolding |
-| **Backend API** | FastAPI, asyncpg/SQLAlchemy, structured errors, Pydantic v2 | Planned (Phase 0) | Implement FastAPI app, routers, config, health checks |
-| **Database** | PostgreSQL 16 with UUID PKs, Alembic migrations | Planned (Phase 0/1) | Docker Compose PostgreSQL + Alembic baseline |
-| **Cache & Event Bus** | Redis 7+ for queueing, pub/sub, SSE/WebSocket streams | Planned (Phase 0/11) | Redis connection pool & event publisher interface |
+| **Backend API** | FastAPI, asyncpg/SQLAlchemy, structured errors, Pydantic v2 | Completed (Phase 0/1/2/3/4) | Full RESTful APIs for CRM, Agent, Signals, Scoring, and Research |
+| **Database** | PostgreSQL 16 with UUID PKs, Alembic migrations | Completed (Phase 0/1/2/3/4) | Migrations 0001-0004 covering CRM, Agent, Score History, and Research |
+| **Cache & Event Bus** | Redis 7+ for queueing, pub/sub, SSE/WebSocket streams | Completed (Phase 0/3/4) | Event Dispatcher with Redis pub/sub channels |
 | **Worker System** | Redis-backed job processor with retries, backoff, idempotency | Planned (Phase 0/1) | Scaffolding worker service & job contracts |
 | **AI Abstraction** | Provider protocol (`Ollama`, `OpenAI`, `Gemini`, `Anthropic`) | Planned (Phase 7) | Protocol interface in `packages/agent-core` |
-| **CRM Core** | 23+ normalized tables (Leads, Companies, Contacts, Signals) | Planned (Phase 1) | Models & migration schemas |
-| **Discovery System** | Multi-source providers (Instagram, Reddit, Web, Search) | Planned (Phase 2) | Interface & normalization pipeline |
-| **Signal Engine** | 18 intent signal types with confidence & evidence | Planned (Phase 3) | Signal schemas & heuristic/LLM detectors |
-| **Website Audit** | Deterministic audit with SSRF defense | Planned (Phase 4) | Deterministic audit engine with IP blacklisting |
+| **CRM Core** | 23+ normalized tables (Leads, Companies, Contacts, Signals) | Completed (Phase 1) | Models & migration schemas |
+| **Discovery System** | Multi-source providers (Instagram, Reddit, Web, Search) | Completed (Phase 2) | User-authorized browser research session |
+| **Signal Engine** | 18 intent signal types with confidence & evidence | Completed (Phase 3) | Signal schemas & heuristic/LLM detectors |
+| **Website Audit** | Deterministic audit with SSRF defense | Completed (Phase 4) | Deep Research engine with SSRF validation, audits, and opportunity scoring |
 
 ---
 
@@ -80,8 +80,19 @@
   - [x] Browser research agent integration with end-to-end observe -> detect -> signal -> score -> match -> qualify pipeline
   - [x] Unit, integration, false-positive rejection, boundary, prompt-injection, and multi-tenant test suite (42/42 tests passing)
   - [x] Architecture documentation (`docs/architecture/signal_and_scoring_engine.md`)
-- [ ] **Phase 4 — Website Intelligence (SSRF-protected deterministic audits)** (Next Recommended Milestone)
-- [ ] **Phase 5 — Deep Research Agent**
+- [x] **Phase 4 — Website Intelligence + Deep Research Engine** (Completed):
+  - [x] Website resolution across company domains, metadata, and handles (`services/api/app/agents/research/website_researcher.py`)
+  - [x] SSRF validation with private/loopback/cloud metadata IP denial (`services/api/app/agents/research/validators.py`)
+  - [x] Hostile prompt injection defense for untrusted web content (`packages/prompts/research/`, `validators.py`)
+  - [x] Multi-category technology detector (`services/api/app/agents/research/technology_detector.py`)
+  - [x] Multi-dimensional page analyzer & website audit (`Performance`, `Mobile`, `UX`, `SEO`, `Conversion`, `E-commerce`)
+  - [x] Deterministic 7-dimension opportunity scoring engine (`services/api/app/services/research_scoring.py`, 0–100)
+  - [x] Database models (`WebsiteResearch`, `WebsitePageResearch`) & Alembic migration (`0004_website_research_tables.py`)
+  - [x] Research Repository & Service orchestration (`services/api/app/services/research_service.py`)
+  - [x] Closed-loop CRM feedback: research findings -> website signals -> score recalculation -> service match -> qualification
+  - [x] REST API endpoints (`/leads/{lead_id}/research`, `/pages`, `/technology`, `/audit`, `/opportunities`, `/re-run`)
+  - [x] Comprehensive test suite covering SSRF, prompt injection, boundaries, multi-tenancy, and end-to-end flow (52/52 tests passing)
+- [ ] **Phase 5 — Outreach Preparation & Agent Orchestration**
 - [ ] **Phase 6 — Lead Scoring Engine Enhancement**
 - [ ] **Phase 7 — Local AI Provider (Ollama)**
 - [ ] **Phase 8 — Personalization & Outreach Draft Agent**
