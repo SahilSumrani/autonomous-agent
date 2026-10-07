@@ -45,6 +45,9 @@ class WebsiteResearchRepository:
         res = await self.session.execute(query)
         return res.scalar_one_or_none()
 
+    async def get_by_lead_id(self, organization_id: uuid.UUID, lead_id: uuid.UUID) -> Optional[WebsiteResearch]:
+        return await self.get_latest_for_lead(lead_id, organization_id)
+
     async def list_history_for_lead(self, lead_id: uuid.UUID, org_id: uuid.UUID) -> List[WebsiteResearch]:
         query = (
             select(WebsiteResearch)

@@ -15,6 +15,13 @@ from services.api.app.models.crm import (
     User,
 )
 
+from services.api.app.models.outreach import (
+    OutreachApproval,
+    OutreachAttempt,
+    OutreachCampaign,
+    OutreachDraft,
+    OutreachEvidence,
+)
 from services.api.app.models.research import (
     WebsitePageResearch,
     WebsiteResearch,
@@ -35,4 +42,9 @@ __all__ = [
     "ActionApproval",
     "WebsiteResearch",
     "WebsitePageResearch",
+    "OutreachCampaign",
+    "OutreachDraft",
+    "OutreachEvidence",
+    "OutreachApproval",
+    "OutreachAttempt",
 ]
