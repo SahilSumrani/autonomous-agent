@@ -47,11 +47,17 @@
   - [x] Docker Compose (`docker-compose.yml`) for PostgreSQL 16 & Redis 7
   - [x] Async Alembic migration initialization (`alembic.ini`, `database/migrations/env.py`)
   - [x] Unit & integration test scaffolding (`tests/test_config.py`, `tests/test_health.py` — 7 passed)
-- [ ] **Phase 1 — CRM Core** (Next Milestone):
-  - [ ] Organizations, Users, Companies, Contacts, Leads, Lead Sources, Pipeline Events
-  - [ ] Normalization & deduplication hierarchy (domain, email, URL)
-  - [ ] CRUD, filtering, pagination, unit tests
-- [ ] **Phase 2 — Discovery Engine** (Local-first, provider-based)
+- [x] **Phase 1 — CRM Core** (Completed):
+  - [x] Domain models: Organization, User, Company, Contact, Lead, LeadSource, LeadSignal, PipelineEvent
+  - [x] Alembic migration (`0001_crm_core_tables.py`) with full constraints and multi-tenant indexes
+  - [x] Normalization engine (`services/api/app/services/normalization.py`) for domains, emails, company names, URLs, handles, phones
+  - [x] Deduplication engine (`services/api/app/services/deduplication.py`) with strict hierarchy & confidence
+  - [x] Repositories (`services/api/app/repositories/crm.py`) with organization multi-tenant boundaries
+  - [x] Service layer (`services/api/app/services/crm_service.py`) with status transitions and transaction safety
+  - [x] Pydantic v2 schemas (`services/api/app/schemas/crm.py`) with pagination and validation
+  - [x] REST APIs (`services/api/app/api/v1/routes/`): Leads, Companies, Contacts, Signals, Pipeline
+  - [x] Unit & integration test suite (`tests/` — 23/23 tests passing)
+- [ ] **Phase 2 — Discovery Engine** (Next Recommended Milestone)
 - [ ] **Phase 3 — Signal Engine**
 - [ ] **Phase 4 — Website Intelligence (SSRF-protected deterministic audits)**
 - [ ] **Phase 5 — Research Agent**

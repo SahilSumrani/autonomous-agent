@@ -1,0 +1,98 @@
+from enum import Enum
+
+
+class UserRole(str, Enum):
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
+    VIEWER = "VIEWER"
+
+
+class CompanyStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    UNKNOWN = "UNKNOWN"
+
+
+class LeadStatus(str, Enum):
+    NEW = "NEW"
+    QUALIFIED = "QUALIFIED"
+    RESEARCHED = "RESEARCHED"
+    OUTREACH_READY = "OUTREACH_READY"
+    APPROVED = "APPROVED"
+    CONTACTED = "CONTACTED"
+    REPLIED = "REPLIED"
+    MEETING = "MEETING"
+    PROPOSAL = "PROPOSAL"
+    WON = "WON"
+    LOST = "LOST"
+
+
+class LeadType(str, Enum):
+    COMPANY = "COMPANY"
+    INDIVIDUAL = "INDIVIDUAL"
+    FOUNDER = "FOUNDER"
+    CREATOR = "CREATOR"
+    FREELANCER = "FREELANCER"
+    OTHER = "OTHER"
+
+
+class SourceType(str, Enum):
+    INSTAGRAM = "INSTAGRAM"
+    REDDIT = "REDDIT"
+    WEB = "WEB"
+    SEARCH = "SEARCH"
+    DIRECTORY = "DIRECTORY"
+    MANUAL = "MANUAL"
+    OTHER = "OTHER"
+
+
+class SignalType(str, Enum):
+    REQUEST_FOR_SERVICE = "REQUEST_FOR_SERVICE"
+    WEBSITE_REQUEST = "WEBSITE_REQUEST"
+    APP_DEVELOPMENT_REQUEST = "APP_DEVELOPMENT_REQUEST"
+    AI_AUTOMATION_REQUEST = "AI_AUTOMATION_REQUEST"
+    HIRING_DEVELOPER = "HIRING_DEVELOPER"
+    HIRING_DESIGNER = "HIRING_DESIGNER"
+    RECENT_FUNDING = "RECENT_FUNDING"
+    BUSINESS_LAUNCH = "BUSINESS_LAUNCH"
+    NEW_PRODUCT = "NEW_PRODUCT"
+    BUSINESS_EXPANSION = "BUSINESS_EXPANSION"
+    GROWTH_SIGNAL = "GROWTH_SIGNAL"
+    WEBSITE_OUTDATED = "WEBSITE_OUTDATED"
+    WEBSITE_SLOW = "WEBSITE_SLOW"
+    POOR_MOBILE_UX = "POOR_MOBILE_UX"
+    WEAK_CONVERSION = "WEAK_CONVERSION"
+    WEAK_SEO = "WEAK_SEO"
+    TECH_STACK_CHANGE = "TECH_STACK_CHANGE"
+    ECOMMERCE_OPPORTUNITY = "ECOMMERCE_OPPORTUNITY"
+
+
+class ActorType(str, Enum):
+    USER = "USER"
+    SYSTEM = "SYSTEM"
+    AGENT = "AGENT"
+
+
+class MatchType(str, Enum):
+    DOMAIN = "DOMAIN"
+    PROFILE_URL = "PROFILE_URL"
+    VERIFIED_EMAIL = "VERIFIED_EMAIL"
+    COMPANY_NAME = "COMPANY_NAME"
+    NONE = "NONE"
+
+
+# Allowed pipeline status transitions
+VALID_STATUS_TRANSITIONS: dict[LeadStatus, set[LeadStatus]] = {
+    LeadStatus.NEW: {LeadStatus.QUALIFIED, LeadStatus.LOST},
+    LeadStatus.QUALIFIED: {LeadStatus.RESEARCHED, LeadStatus.OUTREACH_READY, LeadStatus.LOST},
+    LeadStatus.RESEARCHED: {LeadStatus.OUTREACH_READY, LeadStatus.LOST},
+    LeadStatus.OUTREACH_READY: {LeadStatus.APPROVED, LeadStatus.LOST},
+    LeadStatus.APPROVED: {LeadStatus.CONTACTED, LeadStatus.LOST},
+    LeadStatus.CONTACTED: {LeadStatus.REPLIED, LeadStatus.MEETING, LeadStatus.LOST},
+    LeadStatus.REPLIED: {LeadStatus.MEETING, LeadStatus.PROPOSAL, LeadStatus.LOST},
+    LeadStatus.MEETING: {LeadStatus.PROPOSAL, LeadStatus.WON, LeadStatus.LOST},
+    LeadStatus.PROPOSAL: {LeadStatus.WON, LeadStatus.LOST},
+    LeadStatus.WON: set(),
+    LeadStatus.LOST: {LeadStatus.NEW, LeadStatus.QUALIFIED},  # Allow reactivation
+}
