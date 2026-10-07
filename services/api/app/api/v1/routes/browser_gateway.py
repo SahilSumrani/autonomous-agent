@@ -90,7 +90,7 @@ async def pair_browser_extension(
             )
             session_id = new_session.id
         except Exception as e:
-            logger.error("Failed to create agent session during pairing", error=str(e), exc_info=True)
+            logger.error("Failed to create agent session during pairing: %s", str(e), exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to initialize browser session: {str(e)}",
