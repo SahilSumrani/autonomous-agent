@@ -126,6 +126,13 @@ class OutreachRepository:
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def get_draft(
+        self,
+        organization_id: uuid.UUID,
+        draft_id: uuid.UUID,
+    ) -> Optional[OutreachDraft]:
+        return await self.get_draft_by_id(organization_id, draft_id)
+
     async def list_drafts_by_lead(
         self,
         organization_id: uuid.UUID,
@@ -253,16 +260,20 @@ class OutreachRepository:
 
     async def record_attempt(
         self,
-        organization_id: uuid.UUID,
-        lead_id: uuid.UUID,
-        channel: str,
-        status: str,
+        organization_id: Optional[uuid.UUID] = None,
+        lead_id: Optional[uuid.UUID] = None,
+        channel: str = "INSTAGRAM_DM",
+        status: str = "SENT",
         recipient: Optional[str] = None,
         draft_id: Optional[uuid.UUID] = None,
         reason: Optional[str] = None,
+        org_id: Optional[uuid.UUID] = None,
     ) -> OutreachAttempt:
+        final_org_id = organization_id or org_id
+        if not final_org_id or not lead_id:
+            raise ValueError("organization_id and lead_id are required")
         attempt = OutreachAttempt(
-            organization_id=organization_id,
+            organization_id=final_org_id,
             lead_id=lead_id,
             draft_id=draft_id,
             channel=channel,
@@ -305,3 +316,11 @@ class OutreachRepository:
         )
         res = await self.session.execute(stmt)
         return list(res.scalars().all())
+
+    async def get_attempts_for_lead(
+        self,
+        organization_id: uuid.UUID,
+        lead_id: uuid.UUID,
+    ) -> List[OutreachAttempt]:
+        return await self.list_attempts_by_lead(organization_id, lead_id)
+

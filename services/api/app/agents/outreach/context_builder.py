@@ -15,7 +15,7 @@ from services.api.app.agents.outreach.outreach_models import (
 from services.api.app.models.research import WebsiteResearch
 
 
-class OutreachContextBuilder:
+class OutreachContextBuilder: 
     """Builds unified, evidence-rich outreach context combining CRM, Phase 3, and Phase 4."""
 
     @classmethod

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "TechVerse AI Client Acquisition OS - Browser Agent",
+  "version": "2.0.0",
+  "description": "User-authorized Chrome Browser Agent for TechVerse AI Client Acquisition OS V2",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*",
+    "https://*.instagram.com/*",
+    "https://*.reddit.com/*"
+  ],
+  "background": {
+    "service_worker": "dist/background/service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.instagram.com/*",
+        "https://*.reddit.com/*",
+        "https://*/*",
+        "http://*/*"
+      ],
+      "exclude_matches": [
+        "*://localhost/*",
+        "*://127.0.0.1/*",
+        "*://169.254.169.254/*"
+      ],
+      "js": ["dist/content/content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "dist/popup/popup.html",
+    "default_title": "TechVerse AI Browser Agent"
+  }
+}

@@ -1,0 +1,238 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  width: 360px;
+  background-color: #0F172A;
+  color: #F8FAFC;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.popup-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1E293B;
+  padding-bottom: 10px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-logo {
+  font-size: 16px;
+  color: #38BDF8;
+}
+
+.brand-name {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+  color: #FFFFFF;
+}
+
+.status-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.status-pill.connected {
+  background-color: #064E3B;
+  color: #34D399;
+}
+
+.status-pill.disconnected {
+  background-color: #374151;
+  color: #9CA3AF;
+}
+
+.status-pill.blocked {
+  background-color: #7F1D1D;
+  color: #F87171;
+}
+
+.card {
+  background-color: #1E293B;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #F1F5F9;
+}
+
+.subtitle {
+  color: #94A3B8;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+input[type="text"] {
+  flex: 1;
+  background-color: #0F172A;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #FFFFFF;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  font-family: monospace;
+}
+
+input[type="text"]:focus {
+  outline: none;
+  border-color: #38BDF8;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn:hover {
+  opacity: 0.9;
+}
+
+.btn-primary {
+  background-color: #2563EB;
+  color: #FFFFFF;
+}
+
+.btn-secondary {
+  background-color: #334155;
+  color: #F8FAFC;
+}
+
+.btn-outline-danger {
+  background: transparent;
+  border: 1px solid #EF4444;
+  color: #EF4444;
+}
+
+.btn-success {
+  background-color: #10B981;
+  color: #FFFFFF;
+}
+
+.btn-danger {
+  background-color: #EF4444;
+  color: #FFFFFF;
+}
+
+.error-text {
+  color: #F87171;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.section-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.text-muted {
+  color: #94A3B8;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.card-alert {
+  border-color: #F59E0B;
+  background-color: #1E293B;
+}
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.alert-header h4 {
+  color: #FBBF24;
+  font-size: 13px;
+}
+
+.outreach-details {
+  background-color: #0F172A;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+
+.outreach-details .row {
+  margin-bottom: 4px;
+}
+
+.message-preview {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #334155;
+  font-style: italic;
+  color: #CBD5E1;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.approval-actions .btn {
+  flex: 1;
+}
+
+.footer {
+  text-align: center;
+  font-size: 10px;
+  color: #64748B;
+  margin-top: 4px;
+}
+
+.hidden {
+  display: none !important;
+}

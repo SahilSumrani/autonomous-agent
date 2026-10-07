@@ -57,6 +57,24 @@ class RequestApprovalInput(BaseModel):
     content: str = Field(..., min_length=1, description="Proposed message or comment text")
 
 
+class GetPageStateInput(BaseModel):
+    include_interactive_count: bool = Field(default=True, description="Count interactive elements")
+
+
+class ExecuteApprovedOutreachInput(BaseModel):
+    draft_id: str = Field(..., description="UUID of approved outreach draft")
+    lead_id: str = Field(..., description="UUID of lead")
+    channel: str = Field(..., description="Target outreach channel")
+    recipient: str = Field(..., description="Recipient profile handle or identifier")
+    body: str = Field(..., description="Exact approved message body")
+    approval_id: str = Field(..., description="UUID of action approval")
+    expected_profile_or_domain: Optional[str] = Field(None, description="Target URL/domain verification")
+
+
+class ControlSessionInput(BaseModel):
+    reason: Optional[str] = Field(None, description="Reason for state change")
+
+
 # --- Tool Registry ---
 
 class BrowserToolRegistry:
@@ -153,12 +171,52 @@ _DEFAULT_TOOLS = [
         input_schema=ExtractLinksInput.model_json_schema(),
     ),
     ToolDefinition(
+        name="get_page_state",
+        description="Inspect metadata, URL, and interactive elements of active page.",
+        risk_level=ToolRiskLevel.LOW,
+        permission_level=ToolPermissionLevel.READ_ONLY,
+        requires_approval=False,
+        input_schema=GetPageStateInput.model_json_schema(),
+    ),
+    ToolDefinition(
         name="request_user_approval",
         description="Submit an outbound message or comment for human approval before execution.",
         risk_level=ToolRiskLevel.HIGH,
         permission_level=ToolPermissionLevel.SENSITIVE_ACTION,
         requires_approval=True,
         input_schema=RequestApprovalInput.model_json_schema(),
+    ),
+    ToolDefinition(
+        name="execute_approved_outreach",
+        description="Execute an approved outreach message via the user's active browser session.",
+        risk_level=ToolRiskLevel.HIGH,
+        permission_level=ToolPermissionLevel.SENSITIVE_ACTION,
+        requires_approval=True,
+        input_schema=ExecuteApprovedOutreachInput.model_json_schema(),
+    ),
+    ToolDefinition(
+        name="pause",
+        description="Pause the active browser session operations.",
+        risk_level=ToolRiskLevel.LOW,
+        permission_level=ToolPermissionLevel.USER_INTERACTION,
+        requires_approval=False,
+        input_schema=ControlSessionInput.model_json_schema(),
+    ),
+    ToolDefinition(
+        name="resume",
+        description="Resume operations on a paused browser session.",
+        risk_level=ToolRiskLevel.LOW,
+        permission_level=ToolPermissionLevel.USER_INTERACTION,
+        requires_approval=False,
+        input_schema=ControlSessionInput.model_json_schema(),
+    ),
+    ToolDefinition(
+        name="stop",
+        description="Stop the browser agent session and cancel pending commands.",
+        risk_level=ToolRiskLevel.LOW,
+        permission_level=ToolPermissionLevel.USER_INTERACTION,
+        requires_approval=False,
+        input_schema=ControlSessionInput.model_json_schema(),
     ),
 ]
 

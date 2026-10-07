@@ -46,7 +46,11 @@ def validate_and_sanitize_target_url(raw_url: str) -> str:
         raise SSRFValidationError("URL cannot be empty")
 
     url = raw_url.strip()
-    if not url.startswith(("http://", "https://")):
+    if "://" in url:
+        scheme = url.split("://", 1)[0].lower()
+        if scheme not in ("http", "https"):
+            raise SSRFValidationError(f"Invalid URL scheme: {scheme}")
+    elif not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 
     parsed = urlparse(url)

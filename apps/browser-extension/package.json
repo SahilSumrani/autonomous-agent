@@ -1,0 +1,17 @@
+{
+  "name": "@techverse/browser-extension",
+  "version": "2.0.0",
+  "description": "TechVerse AI Client Acquisition OS - User-Authorized Chrome Browser Agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/extension.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0",
+    "@types/chrome": "^0.0.308"
+  }
+}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechVerse AI Agent</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-logo">⚡</span>
+        <span class="brand-name">TechVerse AI</span>
+      </div>
+      <div id="statusPill" class="status-pill disconnected">Disconnected</div>
+    </header>
+
+    <!-- Content Sections -->
+    <main class="content">
+      <!-- Pairing Section (Shown if disconnected) -->
+      <section id="pairingSection" class="card">
+        <h3>Connect Chrome Agent</h3>
+        <p class="subtitle">Enter the pairing code generated in your TechVerse OS dashboard:</p>
+        <div class="input-group">
+          <input type="text" id="pairingInput" placeholder="TV-XXXX-XXXX" maxlength="15" autocomplete="off" />
+          <button id="pairBtn" class="btn btn-primary">Connect</button>
+        </div>
+        <div id="pairError" class="error-text hidden"></div>
+      </section>
+
+      <!-- Active Session Section (Shown if connected) -->
+      <section id="sessionSection" class="card hidden">
+        <div class="section-row">
+          <span class="label">Session ID:</span>
+          <span id="sessionIdVal" class="mono text-muted">...</span>
+        </div>
+        <div class="section-row">
+          <span class="label">State:</span>
+          <span id="stateVal" class="badge">RUNNING</span>
+        </div>
+
+        <div class="action-buttons">
+          <button id="observeBtn" class="btn btn-secondary">🔍 Observe Tab</button>
+          <button id="disconnectBtn" class="btn btn-outline-danger">Disconnect</button>
+        </div>
+      </section>
+
+      <!-- Pending Outreach Confirmation Card -->
+      <section id="pendingOutreachSection" class="card card-alert hidden">
+        <div class="alert-header">
+          <span class="alert-icon">✉️</span>
+          <h4>Pending Outreach Action</h4>
+        </div>
+        <p class="subtitle">Human approval confirmed in CRM. Review before sending:</p>
+        <div class="outreach-details">
+          <div class="row"><strong>Recipient:</strong> <span id="outreachRecipient">...</span></div>
+          <div class="row"><strong>Channel:</strong> <span id="outreachChannel">...</span></div>
+          <div class="message-preview" id="outreachBody">...</div>
+        </div>
+        <div class="approval-actions">
+          <button id="confirmSendBtn" class="btn btn-success">✓ Send Action</button>
+          <button id="cancelSendBtn" class="btn btn-danger">✕ Cancel</button>
+        </div>
+      </section>
+
+      <!-- Status Notice -->
+      <footer class="footer">
+        <span id="footerNotice">TechVerse AI Client Acquisition OS v2.0</span>
+      </footer>
+    </main>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

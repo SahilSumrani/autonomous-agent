@@ -68,6 +68,21 @@ class EventDispatcher:
         return event_record
 
     @classmethod
+    async def dispatch(
+        cls,
+        event_type: str,
+        data: Dict[str, Any],
+        organization_id: uuid.UUID,
+        lead_id: Optional[uuid.UUID] = None,
+    ) -> Dict[str, Any]:
+        return await cls.emit(
+            event_type=event_type,
+            org_id=organization_id,
+            payload=data,
+            lead_id=lead_id,
+        )
+
+    @classmethod
     def get_recent_events(cls, event_type: Optional[str] = None) -> List[Dict[str, Any]]:
         if event_type:
             return [e for e in _in_memory_event_log if e["event_type"] == event_type]
@@ -76,3 +91,4 @@ class EventDispatcher:
     @classmethod
     def clear_events(cls) -> None:
         _in_memory_event_log.clear()
+

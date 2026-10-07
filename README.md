@@ -104,10 +104,29 @@ Interactive API docs available at `http://localhost:8000/docs`.
 pytest
 ```
 
+### 7. Chrome Extension Build & Pairing
+```bash
+# 1. Build extension bundle
+cd apps/browser-extension
+npm install
+npm run build
+
+# 2. In Google Chrome:
+# Navigate to chrome://extensions/ -> Enable 'Developer mode' -> 'Load unpacked' -> Select apps/browser-extension/dist
+
+# 3. Request pairing challenge from backend:
+curl -X POST http://localhost:8000/api/v1/agent/browser/challenge -H "X-Organization-ID: <org-uuid>"
+
+# 4. Open extension popup in Chrome and enter the pairing code to authorize the session.
+```
+
 ---
 
 ## Security & Compliance Rules
 - **No Scraping Bypass**: No CAPTCHA evasion, stealth fingerprinting, or credential stuffing.
-- **Human in the Loop**: All outreach drafts require explicit human approval before transmission.
-- **SSRF Hardened**: All website audit tools validate target IPs against RFC 1918 private ranges, loopback, and metadata endpoints.
+- **Zero Exfiltration**: Extension does not request cookies, passwords, or persistent session credentials.
+- **Human in the Loop**: All outreach drafts require explicit human approval and final popup confirmation before transmission.
+- **SSRF Hardened**: All website audit tools validate target IPs against RFC 1918 private ranges, loopback, and cloud metadata endpoints.
 - **Zero Hallucination**: Every research and signal datapoint requires source, evidence, and confidence.
+- **Uncertain Delivery Safe**: Ambiguous message delivery status transitions to `DELIVERY_UNKNOWN` without automated retry.
+
