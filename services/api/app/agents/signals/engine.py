@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from packages.shared_types.crm import SignalType
+from services.api.app.agents.signals.urgency import UrgencyDetector, UrgencyLevel, UrgencyResult
 
 
 class DetectedSignal(BaseModel):
@@ -15,13 +16,21 @@ class DetectedSignal(BaseModel):
     detected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-# False positive indicator patterns (e.g. competitors, job seekers, casual consumers)
-DISQUALIFYING_PATTERNS = [
-    r"\b(i am|i'm|as a)\s+(a\s+)?(web developer|web designer|freelance developer|software engineer)\s+(looking for|seeking|available for)\s+(clients|work|projects)\b",
-    r"\b(hire me|my portfolio|check out my portfolio|freelancer available)\b",
-    r"\b(anyone know a good website (to|for|where|that))\s+(watch|stream|play|download|read|buy shoes)\b",
-    r"\b(i built|we already built|just launched|finished building)\s+(my|our|a)\s+(website|app)\b",
-]
+# False positive indicator categories and patterns (competitors, job seekers, students, casual consumers)
+DISQUALIFYING_CATEGORIES = {
+    "STUDENT": r"\b(for school|homework|class project|school assignment|student project|college assignment|college project|studying for|cs student|college class|college homework)\b",
+    "JOB_SEEKER": r"\b(resume|cv|applying for|looking for (an? )?([a-z\-_]+\s+)*job|seeking (a )?([a-z\-_]+\s+)*job|seeking employment|internship|hire me as a developer|seeking a position|open to work|#opentowork)\b",
+    "FREELANCER": r"\b(i am|i'm|as a)\s+(a\s+)?(freelance\s+)?(web developer|web designer|developer|designer|freelancer|software engineer)\s+(looking for|seeking|available for)\s+(clients|work|projects)\b|\b(hire me|my portfolio|check out my portfolio|freelancer available|freelance developer available|freelance designer available)\b",
+    "DEVELOPER_SELF_PROMO": r"\b(i (build|design|create|make|develop)\s+(websites|apps|mobile apps|software|landing pages)|(hire|dm|contact)\s+me\s+(to|for|if you need)|open for (freelance|work|clients|projects)|available for (freelance|hire|new projects)|check out my (latest|recent)?\s*(work|projects|portfolio)|my services include|offering (web|app|development|design) services|freelance (web developer|designer|engineer) available)\b",
+    "COMPETITOR_AGENCY": r"\b(our agency offers|we are a web design agency|we are a digital agency|dm us for web dev|marketing agency here to help|we provide seo services)\b",
+    "CONSUMER_HELP": r"\b(anyone know a good website (to|for|where|that))\s+(watch|stream|play|download|read|buy shoes|find movies)\b|\b(personal help|for my own personal use)\b",
+    "ALREADY_BUILT": r"\b(i built|we already built|just launched|finished building)\s+(my|our|a)\s+(website|app)\b",
+    "EDUCATIONAL_TIPS": r"\b(before you hire|how to hire|tips (for|on) hiring|when (to hire|you hire)|how do you know you need|reasons why you need|why you need a|here('s| is) why you need|(?:\d+|five|three|four|ten|few) things to|questions to ask (a|your)?\s*(developer|designer|agency)|send these (?:\d+|five|three|four|ten|few) things|tips for building|here are (?:\d+|five|three|four|ten|few) (tips|reasons|mistakes))\b",
+    "PROMOTIONAL_MEDIA": r"\b(podcast for|listen to (our|the|this)?\s*podcast|new episode of|check out our podcast|subscribe to our (podcast|channel|newsletter)|on this episode|watch the full episode)\b",
+    "AGENCY_SELF_PROMO": r"\b(we help (brands|startups|companies|businesses)|we design and build|transform your (online|brand|business)|reach out to us for|book a (call|consultation) (with us|today)|link in bio to (work with us|book|get started))\b",
+}
+
+DISQUALIFYING_PATTERNS = list(DISQUALIFYING_CATEGORIES.values())
 DISQUALIFYING_REGEX = re.compile("|".join(DISQUALIFYING_PATTERNS), re.IGNORECASE)
 
 
@@ -29,37 +38,37 @@ DISQUALIFYING_REGEX = re.compile("|".join(DISQUALIFYING_PATTERNS), re.IGNORECASE
 SIGNAL_TAXONOMY_RULES: List[Dict[str, Any]] = [
     {
         "type": SignalType.WEBSITE_REQUEST,
-        "pattern": r"\b(need|looking for|want|hire|seeking)\s+(an?\s+)?(new\s+)?(website|web site|landing page|web developer|web designer|web dev)\b|\b(looking for\s+)?someone to build\s+(an?\s+)?(new\s+)?(website|site|landing page|web\s*app)\b|\b(build|develop|redesign)\s+(me|us|our|a)?\s*(new\s+)?(website|site|landing page)\b",
+        "pattern": r"\b(need|looking for|lf|want|hire|seeking|recommend\s+(?:someone|anyone)\s+who\s+can\s+(?:build|make|develop|redesign))\s+(?:an?|the|our)?\s*(?:[a-zA-Z0-9-]+\s+)?(website|web site|site|landing page|marketing site|web developer|web designer|web dev)\b|\b(?:looking for\s+)?someone to build\s+(?:an?|the|our)?\s*(?:[a-zA-Z0-9-]+\s+)?(website|site|landing page|marketing site|web\s*app)\b|\b(build|develop|redesign)\s+(?:me|us|our|a|the)?\s*(?:[a-zA-Z0-9-]+\s+)?(website|site|landing page|marketing site)\b",
         "confidence": 0.95,
         "template": "Explicit public request seeking a website or web developer.",
     },
     {
         "type": SignalType.WEBSITE_OUTDATED,
-        "pattern": r"\b(redesign(ing)?|revamp(ing)?|rebuild(ing)?|re-design|our\s+site\s+looks\s+(old|ancient|dated|90s)|haven't\s+updated\s+our\s+website\s+in\s+years)\b",
+        "pattern": r"\b(redesign(ing)?|revamp(ing)?|rebuild(ing)?|re-design|our\s+site\s+looks\s+(old|ancient|dated|90s)|haven't\s+updated\s+our\s+website\s+in\s+years|website redesign request)\b",
         "confidence": 0.92,
         "template": "Evidence of outdated design or explicit need for website redesign.",
     },
     {
         "type": SignalType.APP_DEVELOPMENT_REQUEST,
-        "pattern": r"\b(need|looking for|build|develop)\s+(an?\s+)?(mobile app|ios app|android app|react native app|flutter app)\b",
+        "pattern": r"\b(need|looking for|lf|build|develop|seeking|hire|recommend\s+(?:someone|anyone)\s+who\s+can\s+(?:build|make|develop))\s+(?:an?|the|our)?\s*(?:[a-zA-Z0-9-]+\s+)?(app|mobile app|web app|ios app|android app|react native app|flutter app|app developer|application)\b|\b(?:someone|anyone)\s+who\s+can\s+(?:build|make|develop)\s+(?:an?|the|our)?\s*(?:[a-zA-Z0-9-]+\s+)?(app|mobile app|web app|application)\b",
         "confidence": 0.94,
-        "template": "Request identified for custom mobile application development.",
+        "template": "Request identified for custom application development.",
     },
     {
         "type": SignalType.AI_AUTOMATION_REQUEST,
-        "pattern": r"\b(ai\s+automation|automate\s+(my|our)\s+workflows?|ai\s+agents?|custom\s+llm|ai\s+bot|automation\s+agency)\b",
+        "pattern": r"\b(ai\s+automation|automate\s+(my|our)\s+workflows?|ai\s+agents?|custom\s+llm|ai\s+bot|automation\s+agency|ai automation requirement)\b",
         "confidence": 0.93,
         "template": "Business seeking AI automation or agentic workflow development.",
     },
     {
         "type": SignalType.HIRING_DEVELOPER,
-        "pattern": r"\b(hiring|looking to hire|we're hiring)\s+(a\s+)?(developer|frontend|backend|fullstack|software engineer|tech lead)\b",
+        "pattern": r"\b(hiring|looking to hire|we're hiring|lf|looking for|need)\s+(a\s+)?(developer|frontend|backend|fullstack|software engineer|tech lead)\b",
         "confidence": 0.90,
         "template": "Active hiring posting for software or web development talent.",
     },
     {
         "type": SignalType.HIRING_DESIGNER,
-        "pattern": r"\b(hiring|looking to hire|we're hiring)\s+(a\s+)?(ui\/?ux designer|product designer|web designer|graphic designer)\b",
+        "pattern": r"\b(hiring|looking to hire|we're hiring|lf|looking for|need)\s+(a\s+)?(ui\/?ux designer|product designer|web designer|graphic designer|designer)\b",
         "confidence": 0.88,
         "template": "Active hiring posting for UI/UX or digital product design.",
     },
@@ -101,9 +110,9 @@ SIGNAL_TAXONOMY_RULES: List[Dict[str, Any]] = [
     },
     {
         "type": SignalType.REQUEST_FOR_SERVICE,
-        "pattern": r"\b(recommend|looking for|seeking)\s+(an?\s+)?(agency|consultant|service provider|technical partner|dev shop)\b",
+        "pattern": r"\b(recommend|looking for|lf|seeking|need|hiring)\s+(?:an?\s+)?(?:[a-zA-Z0-9_\-\/]+\s+)*(?:agency|consultant|service provider|technical partner|dev shop|creator|editor|video editor|creators\/editors|video creator|partner|talent|freelancer)\b",
         "confidence": 0.89,
-        "template": "Public request for specialized agency or technical service partner.",
+        "template": "Public request for specialized service provider, creative editor, or technical partner.",
     },
     {
         "type": SignalType.WEBSITE_SLOW,
@@ -156,6 +165,31 @@ class SignalDetectionEngine:
         return bool(DISQUALIFYING_REGEX.search(text))
 
     @classmethod
+    def classify_disqualification(cls, text: str) -> Optional[str]:
+        """Return human-readable explanation of why a candidate was disqualified."""
+        if not text:
+            return None
+        clean = cls.sanitize_text(text)
+        for cat, pattern in DISQUALIFYING_CATEGORIES.items():
+            if re.search(pattern, clean, re.IGNORECASE):
+                if cat == "STUDENT":
+                    return "Student / academic homework project"
+                elif cat == "JOB_SEEKER":
+                    return "Job seeker looking for employment"
+                elif cat == "FREELANCER":
+                    return "Freelancer looking for clients / work"
+                elif cat == "DEVELOPER_SELF_PROMO":
+                    return "Developer advertising their own services"
+                elif cat == "COMPETITOR_AGENCY":
+                    return "Competitor agency / service provider"
+                elif cat == "CONSUMER_HELP":
+                    return "Consumer personal help inquiry"
+                elif cat == "ALREADY_BUILT":
+                    return "Already built website / project finished"
+                return f"Disqualified: {cat}"
+        return None
+
+    @classmethod
     def detect_signals(
         cls,
         text: Optional[str],
@@ -201,4 +235,66 @@ class SignalDetectionEngine:
         return signals
 
     analyze = detect_signals
+
+    BUYING_INTENT_SIGNALS = {
+        SignalType.WEBSITE_REQUEST,
+        SignalType.APP_DEVELOPMENT_REQUEST,
+        SignalType.AI_AUTOMATION_REQUEST,
+        SignalType.ECOMMERCE_OPPORTUNITY,
+        SignalType.REQUEST_FOR_SERVICE,
+        SignalType.HIRING_DEVELOPER,
+        SignalType.HIRING_DESIGNER,
+    }
+
+    GROWTH_SIGNALS = {
+        SignalType.BUSINESS_LAUNCH,
+        SignalType.NEW_PRODUCT,
+        SignalType.BUSINESS_EXPANSION,
+        SignalType.GROWTH_SIGNAL,
+        SignalType.RECENT_FUNDING,
+    }
+
+    HIRING_SIGNALS = {
+        SignalType.HIRING_DEVELOPER,
+        SignalType.HIRING_DESIGNER,
+    }
+
+    TECHNICAL_SIGNALS = {
+        SignalType.WEBSITE_OUTDATED,
+        SignalType.WEBSITE_SLOW,
+        SignalType.POOR_MOBILE_UX,
+        SignalType.WEAK_CONVERSION,
+        SignalType.WEAK_SEO,
+        SignalType.TECH_STACK_CHANGE,
+    }
+
+    @classmethod
+    def classify_signals(cls, signals: List[DetectedSignal]) -> Dict[str, List[DetectedSignal]]:
+        """Group detected signals into intent, growth, hiring, and technical categories."""
+        grouped: Dict[str, List[DetectedSignal]] = {
+            "buying_intent": [],
+            "growth": [],
+            "hiring": [],
+            "technical": [],
+        }
+        for sig in signals:
+            if sig.signal_type in cls.BUYING_INTENT_SIGNALS:
+                grouped["buying_intent"].append(sig)
+            elif sig.signal_type in cls.GROWTH_SIGNALS:
+                grouped["growth"].append(sig)
+            elif sig.signal_type in cls.HIRING_SIGNALS:
+                grouped["hiring"].append(sig)
+            elif sig.signal_type in cls.TECHNICAL_SIGNALS:
+                grouped["technical"].append(sig)
+        return grouped
+
+    @classmethod
+    def has_explicit_intent(cls, signals: List[DetectedSignal]) -> bool:
+        """True if at least one high-intent buying or service request signal was detected."""
+        return any(sig.signal_type in cls.BUYING_INTENT_SIGNALS for sig in signals)
+
+    @classmethod
+    def evaluate_urgency(cls, text: Optional[str]) -> UrgencyResult:
+        """Deterministically assess temporal and business urgency backed by observable evidence."""
+        return UrgencyDetector.evaluate(text)
 

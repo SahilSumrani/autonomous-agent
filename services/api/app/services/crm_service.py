@@ -2,6 +2,7 @@ import math
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.shared_types.crm import (
@@ -119,10 +120,22 @@ class CompanyService:
             status=data.status.value,
             metadata_json=data.metadata_json,
         )
-        created = await self.repo.create(company)
-        await self.session.commit()
-        await self.session.refresh(created)
-        return created
+        try:
+            created = await self.repo.create(company)
+            await self.session.commit()
+            await self.session.refresh(created)
+            return created
+        except IntegrityError:
+            await self.session.rollback()
+            existing = None
+            if norm_domain:
+                existing = await self.repo.get_by_domain(data.organization_id, norm_domain)
+            if not existing and norm_name:
+                existing = await self.repo.get_by_normalized_name(data.organization_id, norm_name)
+            raise DuplicateEntityException(
+                f"Concurrent duplicate company detected for '{data.name}'",
+                matched_entity_id=existing.id if existing else None,
+            )
 
     async def get_company(self, org_id: uuid.UUID, company_id: uuid.UUID) -> Company:
         company = await self.repo.get_by_id(org_id, company_id)
@@ -214,10 +227,20 @@ class ContactService:
             linkedin_url=norm_linkedin,
             location=data.location,
         )
-        created = await self.repo.create(contact)
-        await self.session.commit()
-        await self.session.refresh(created)
-        return created
+        try:
+            created = await self.repo.create(contact)
+            await self.session.commit()
+            await self.session.refresh(created)
+            return created
+        except IntegrityError:
+            await self.session.rollback()
+            existing = None
+            if norm_email:
+                existing = await self.repo.get_by_email(data.organization_id, norm_email)
+            raise DuplicateEntityException(
+                f"Concurrent duplicate contact detected for '{data.full_name or norm_email}'",
+                matched_entity_id=existing.id if existing else None,
+            )
 
     async def get_contact(self, org_id: uuid.UUID, contact_id: uuid.UUID) -> Contact:
         contact = await self.repo.get_by_id(org_id, contact_id)
@@ -303,21 +326,31 @@ class LeadService:
             overall_score=data.overall_score,
             recommended_service=data.recommended_service,
         )
-        created = await self.repo.create(lead)
+        try:
+            created = await self.repo.create(lead)
 
-        # Record initial pipeline event
-        event = PipelineEvent(
-            lead_id=created.id,
-            old_status=None,
-            new_status=created.status,
-            actor_type=ActorType.SYSTEM.value,
-            reason="Lead created",
-        )
-        await self.event_repo.create(event)
+            # Record initial pipeline event
+            event = PipelineEvent(
+                lead_id=created.id,
+                old_status=None,
+                new_status=created.status,
+                actor_type=ActorType.SYSTEM.value,
+                reason="Lead created",
+            )
+            await self.event_repo.create(event)
 
-        await self.session.commit()
-        await self.session.refresh(created)
-        return created
+            await self.session.commit()
+            await self.session.refresh(created)
+            return created
+        except IntegrityError:
+            await self.session.rollback()
+            existing = None
+            if norm_profile:
+                existing = await self.repo.get_by_profile_url(data.organization_id, norm_profile)
+            raise DuplicateEntityException(
+                f"Concurrent duplicate lead detected for profile '{norm_profile or data.title}'",
+                matched_entity_id=existing.id if existing else None,
+            )
 
     async def get_lead(self, org_id: uuid.UUID, lead_id: uuid.UUID) -> Lead:
         lead = await self.repo.get_by_id(org_id, lead_id)

@@ -47,3 +47,40 @@ class OutreachEngine:
         )
 
         return context, drafts
+
+    @classmethod
+    async def execute_async(
+        cls,
+        lead: Lead,
+        company: Optional[Company] = None,
+        contact: Optional[Contact] = None,
+        sources: Optional[List[LeadSource]] = None,
+        signals: Optional[List[LeadSignal]] = None,
+        website_research: Optional[WebsiteResearch] = None,
+        channel: Optional[OutreachChannel] = None,
+        variant_count: int = 3,
+        preferences: Optional[List[str]] = None,
+        ai_provider: Optional[Any] = None,
+    ) -> (OutreachContext, List[OutreachDraftResult]):
+        # 1. Build unified evidence context
+        context = OutreachContextBuilder.build_context(
+            lead=lead,
+            company=company,
+            contact=contact,
+            sources=sources,
+            signals=signals,
+            website_research=website_research,
+        )
+
+        target_channel = channel or context.recommended_channel
+
+        # 2. Generate and validate variants (with AI provider if configured)
+        drafts = await MessageGenerator.generate_variants_async(
+            context=context,
+            channel=target_channel,
+            variant_count=variant_count,
+            preferences=preferences,
+            ai_provider=ai_provider,
+        )
+
+        return context, drafts

@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+import os
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from packages.config.settings import settings
 from services.api.app.api.v1.router import api_v1_router
 from services.api.app.api.v1.routes.health import get_health_status
@@ -14,6 +15,7 @@ from services.api.app.middleware.request_context import RequestContextMiddleware
 # Initialize Structured Logging
 setup_logging()
 logger = get_logger("main")
+
 
 
 @asynccontextmanager
@@ -86,6 +88,17 @@ app.add_api_route(
 
 # Mount API v1 Routers
 app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
+async def get_dashboard():
+    """Serve real-time autonomous prospecting and client discovery dashboard."""
+    dashboard_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "apps", "web", "index.html")
+    )
+    if os.path.exists(dashboard_path):
+        return FileResponse(dashboard_path)
+    return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
 
 
 @app.exception_handler(Exception)

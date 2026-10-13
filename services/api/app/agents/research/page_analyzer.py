@@ -50,6 +50,20 @@ class PageAnalyzer:
     ) -> PageAnalysisResult:
         page_type = cls.classify_page_type(url)
         clean_text = sanitize_untrusted_page_content(visible_text or html_content)
+        
+        # If no page content exists (e.g. empty crawl/unreachable), fail truthful with no fabricated findings
+        if not html_content or not html_content.strip():
+            return PageAnalysisResult(
+                url=url,
+                page_type=page_type,
+                title=None,
+                status_code=status_code if status_code != 200 else 0,
+                content_summary="Page content unavailable or empty.",
+                visible_text=None,
+                links_count=0,
+                evidence=[],
+            )
+
         content_lower = (html_content + " " + clean_text).lower()
 
         # Extract title

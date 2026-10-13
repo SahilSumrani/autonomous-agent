@@ -12,6 +12,9 @@ class BrowserCommandType(str, Enum):
     FIND_TEXT = "FIND_TEXT"
     SCROLL = "SCROLL"
     CLICK = "CLICK"
+    TYPE_TEXT = "TYPE_TEXT"
+    PRESS_KEY = "PRESS_KEY"
+    FIND_SEARCH_INPUT = "FIND_SEARCH_INPUT"
     EXTRACT_VISIBLE_CONTENT = "EXTRACT_VISIBLE_CONTENT"
     EXTRACT_LINKS = "EXTRACT_LINKS"
     GET_PAGE_STATE = "GET_PAGE_STATE"
@@ -75,7 +78,7 @@ class BrowserCommandResult(BaseModel):
     error: Optional[str] = None
     duration_ms: float = 0.0
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    correlation_id: str
+    correlation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
 
 class PageState(BaseModel):

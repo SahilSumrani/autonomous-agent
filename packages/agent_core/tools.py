@@ -22,7 +22,9 @@ class OpenPageInput(BaseModel):
 
 
 class NavigateInput(BaseModel):
-    direction: str = Field(..., description="'back', 'forward', or 'reload'")
+    direction: Optional[str] = Field(None, description="'back', 'forward', or 'reload'")
+    url: Optional[str] = Field(None, description="Target HTTP/HTTPS URL to navigate to")
+    target_url: Optional[str] = Field(None, description="Target HTTP/HTTPS URL to navigate to")
 
 
 class ReadPageInput(BaseModel):

@@ -59,6 +59,11 @@ body {
   color: #34D399;
 }
 
+.status-pill.reconnecting {
+  background-color: #78350F;
+  color: #FBBF24;
+}
+
 .status-pill.disconnected {
   background-color: #374151;
   color: #9CA3AF;
@@ -67,6 +72,60 @@ body {
 .status-pill.blocked {
   background-color: #7F1D1D;
   color: #F87171;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #334155;
+  color: #F8FAFC;
+}
+
+.badge-info {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38BDF8;
+}
+
+.badge-green {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34D399;
+}
+
+.badge-amber {
+  background: rgba(251, 191, 36, 0.2);
+  color: #FBBF24;
+}
+
+.badge-red {
+  background: rgba(248, 113, 113, 0.2);
+  color: #F87171;
+}
+
+.task-control-box {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.select-input, .text-input {
+  width: 100%;
+  background: #0F172A;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #FFFFFF;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.select-input:focus, .text-input:focus {
+  outline: none;
+  border-color: #38BDF8;
 }
 
 .card {

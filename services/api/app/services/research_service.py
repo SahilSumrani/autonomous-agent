@@ -96,13 +96,15 @@ class ResearchService:
             company_name=company_name,
         )
 
+        is_unavailable = res.get("status") == ResearchStatus.RESEARCH_UNAVAILABLE.value
+
         # 5. Persist WebsiteResearch record
         research_record = WebsiteResearch(
             organization_id=org_id,
             lead_id=lead_id,
             company_id=lead.company_id,
             website_url=resolved_url,
-            status=ResearchStatus.COMPLETED.value,
+            status=res.get("status", ResearchStatus.COMPLETED.value),
             started_at=datetime.now(timezone.utc),
             completed_at=datetime.now(timezone.utc),
             pages_analyzed=res["pages_analyzed"],
@@ -115,14 +117,14 @@ class ResearchService:
             payment_provider=res["payment_provider"],
             cdn=res["cdn"],
             ecommerce_platform=res["ecommerce_platform"],
-            website_health_score=res["scores"].website_health_score,
-            performance_score=res["scores"].performance_score,
-            mobile_score=res["scores"].mobile_score,
-            ux_score=res["scores"].ux_score,
-            seo_score=res["scores"].seo_score,
-            conversion_score=res["scores"].conversion_score,
-            accessibility_score=res["scores"].accessibility_score,
-            opportunity_score=res["opportunity_breakdown"].total_opportunity_score,
+            website_health_score=res["scores"].website_health_score if not is_unavailable else 0,
+            performance_score=res["scores"].performance_score if not is_unavailable else 0,
+            mobile_score=res["scores"].mobile_score if not is_unavailable else 0,
+            ux_score=res["scores"].ux_score if not is_unavailable else 0,
+            seo_score=res["scores"].seo_score if not is_unavailable else 0,
+            conversion_score=res["scores"].conversion_score if not is_unavailable else 0,
+            accessibility_score=res["scores"].accessibility_score if not is_unavailable else 0,
+            opportunity_score=res["opportunity_breakdown"].total_opportunity_score if not is_unavailable else 0,
             summary=res["summary"],
             positive_findings=res["positive_findings"],
             negative_findings=res["negative_findings"],
@@ -130,6 +132,15 @@ class ResearchService:
             confidence=res["confidence"],
         )
         await self.research_repo.create_research(research_record)
+
+        if is_unavailable:
+            await EventDispatcher.emit(
+                event_type="lead.research.unavailable",
+                org_id=org_id,
+                lead_id=lead_id,
+                payload={"website_url": resolved_url, "reason": res["summary"]},
+            )
+            return research_record
 
         # 6. Persist individual page results
         for page_data in res["analyzed_pages"]:

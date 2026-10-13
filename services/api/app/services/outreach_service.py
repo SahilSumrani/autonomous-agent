@@ -27,6 +27,7 @@ from services.api.app.repositories.crm import (
 )
 from services.api.app.repositories.outreach import OutreachRepository
 from services.api.app.repositories.research import WebsiteResearchRepository
+from services.api.app.providers.ai.factory import get_ai_provider
 from services.api.app.services.event_dispatcher import EventDispatcher
 from services.api.app.services.outreach_history import OutreachHistoryManager
 
@@ -99,6 +100,35 @@ class OutreachService:
         if lead.contact_id:
             contact = await self.contact_repo.get_by_id(organization_id, lead.contact_id)
 
+        # Enforce verified recipient email requirement for email outreach
+        if target_channel == OutreachChannel.EMAIL:
+            recipient_email = None
+            if contact and getattr(contact, "email", None):
+                recipient_email = contact.email
+            elif company and getattr(company, "email", None):
+                recipient_email = company.email
+            elif getattr(lead, "email", None):
+                recipient_email = lead.email
+
+            if not recipient_email:
+                reason = "No verified recipient email available for email outreach"
+                await self.outreach_repo.record_attempt(
+                    organization_id=organization_id,
+                    lead_id=lead_id,
+                    channel=target_channel.value,
+                    status="BLOCKED",
+                    recipient=lead.title,
+                    reason=reason,
+                )
+                await EventDispatcher.emit(
+                    event_type="lead.outreach.blocked",
+                    org_id=organization_id,
+                    lead_id=lead_id,
+                    payload={"channel": target_channel.value, "reason": reason},
+                )
+                await self.session.commit()
+                raise ValueError(reason)
+
         # Fetch signals
         signals = await self.signal_repo.list_by_lead(lead_id)
 
@@ -114,8 +144,15 @@ class OutreachService:
             if src:
                 sources.append(src)
 
-        # 3. Execute outreach engine
-        context, draft_results = OutreachEngine.execute(
+        # 3. Resolve configured AI provider if available (with deterministic fallback)
+        ai_provider = None
+        try:
+            ai_provider = get_ai_provider()
+        except Exception:
+            ai_provider = None
+
+        # Execute outreach engine
+        context, draft_results = await OutreachEngine.execute_async(
             lead=lead,
             company=company,
             contact=contact,
@@ -125,6 +162,7 @@ class OutreachService:
             channel=target_channel,
             variant_count=variant_count,
             preferences=preferences,
+            ai_provider=ai_provider,
         )
 
         await EventDispatcher.emit(
@@ -305,7 +343,13 @@ class OutreachService:
         if not draft:
             return None
 
-        # 1. Update draft status
+        # 1. Enforce state machine transition: must be READY_FOR_APPROVAL
+        if draft.status not in (DraftStatus.READY_FOR_APPROVAL.value, DraftStatus.APPROVED.value):
+            raise ValueError(
+                f"Illegal state transition: cannot approve draft in state '{draft.status}'. Only READY_FOR_APPROVAL drafts can be approved."
+            )
+
+        # Update draft status
         draft.status = DraftStatus.APPROVED.value
         draft.updated_at = datetime.now(timezone.utc)
 
@@ -350,6 +394,12 @@ class OutreachService:
         draft = await self.outreach_repo.get_draft_by_id(organization_id, draft_id)
         if not draft:
             return None
+
+        # Cannot reject already sent or executed drafts
+        if draft.status in (DraftStatus.SENT.value, DraftStatus.SUPERSEDED.value):
+            raise ValueError(
+                f"Illegal state transition: cannot reject draft in terminal/executed state '{draft.status}'."
+            )
 
         draft.status = DraftStatus.REJECTED.value
         draft.updated_at = datetime.now(timezone.utc)

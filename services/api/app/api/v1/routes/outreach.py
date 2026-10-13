@@ -206,12 +206,16 @@ async def approve_outreach_draft(
     reviewed_by = data.reviewed_by if data else "SAHIL"
     reason = data.decision_reason if data else "Approved outreach draft."
 
-    draft = await service.approve_draft(
-        organization_id=org_id,
-        draft_id=draft_id,
-        reviewed_by=reviewed_by,
-        decision_reason=reason,
-    )
+    try:
+        draft = await service.approve_draft(
+            organization_id=org_id,
+            draft_id=draft_id,
+            reviewed_by=reviewed_by,
+            decision_reason=reason,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
     if not draft or draft.lead_id != lead_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outreach draft not found")
     return _to_draft_response(draft)
@@ -227,12 +231,16 @@ async def reject_outreach_draft(
 ) -> OutreachDraftResponse:
     """Rejects an outreach draft with an auditable reason."""
     service = OutreachService(db)
-    draft = await service.reject_draft(
-        organization_id=org_id,
-        draft_id=draft_id,
-        reviewed_by=data.reviewed_by,
-        decision_reason=data.decision_reason,
-    )
+    try:
+        draft = await service.reject_draft(
+            organization_id=org_id,
+            draft_id=draft_id,
+            reviewed_by=data.reviewed_by,
+            decision_reason=data.decision_reason,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
     if not draft or draft.lead_id != lead_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outreach draft not found")
     return _to_draft_response(draft)

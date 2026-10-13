@@ -96,6 +96,7 @@ class Company(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     leads: Mapped[List["Lead"]] = relationship("Lead", back_populates="company")
 
     __table_args__ = (
+        UniqueConstraint("organization_id", "normalized_domain", name="uq_companies_org_domain"),
         Index("ix_companies_org_domain", "organization_id", "normalized_domain"),
         Index("ix_companies_org_name", "organization_id", "normalized_name"),
     )
@@ -136,6 +137,7 @@ class Contact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     leads: Mapped[List["Lead"]] = relationship("Lead", back_populates="contact")
 
     __table_args__ = (
+        UniqueConstraint("organization_id", "email", name="uq_contacts_org_email"),
         Index("ix_contacts_org_email", "organization_id", "email"),
     )
 
@@ -227,6 +229,7 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     score_history: Mapped[List["LeadScoreHistory"]] = relationship("LeadScoreHistory", back_populates="lead", cascade="all, delete-orphan", order_by="desc(LeadScoreHistory.created_at)")
 
     __table_args__ = (
+        UniqueConstraint("organization_id", "profile_url", name="uq_leads_org_profile_url"),
         CheckConstraint("intent_score >= 0 AND intent_score <= 100", name="chk_lead_intent_score"),
         CheckConstraint("qualification_score >= 0 AND qualification_score <= 100", name="chk_lead_qualification_score"),
         CheckConstraint("overall_score >= 0 AND overall_score <= 100", name="chk_lead_overall_score"),

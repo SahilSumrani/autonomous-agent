@@ -9,10 +9,13 @@
     "tabs"
   ],
   "host_permissions": [
-    "http://localhost:8000/*",
-    "http://127.0.0.1:8000/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
     "https://*.instagram.com/*",
-    "https://*.reddit.com/*"
+    "https://*.reddit.com/*",
+    "https://*.threads.net/*",
+    "https://*.threads.com/*",
+    "https://books.toscrape.com/*"
   ],
   "background": {
     "service_worker": "background/service_worker.js",
@@ -21,15 +24,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.instagram.com/*",
-        "https://*.reddit.com/*",
         "https://*/*",
         "http://*/*"
-      ],
-      "exclude_matches": [
-        "*://localhost/*",
-        "*://127.0.0.1/*",
-        "*://169.254.169.254/*"
       ],
       "js": ["content/content_script.js"],
       "run_at": "document_idle"

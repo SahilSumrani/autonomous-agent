@@ -51,6 +51,69 @@ class MessageGenerator:
         return results
 
     @classmethod
+    async def generate_variants_async(
+        cls,
+        context: OutreachContext,
+        channel: OutreachChannel,
+        variant_count: int = 3,
+        preferences: Optional[List[str]] = None,
+        ai_provider: Optional[Any] = None,
+    ) -> List[OutreachDraftResult]:
+        deterministic_drafts = cls.generate_variants(
+            context=context,
+            channel=channel,
+            variant_count=variant_count,
+            preferences=preferences,
+        )
+        if not ai_provider:
+            return deterministic_drafts
+
+        refined_results: List[OutreachDraftResult] = []
+        for d in deterministic_drafts:
+            try:
+                system_prompt = (
+                    "You are a technical B2B outreach copywriter for TechVerse AI. "
+                    "Refine the clarity and tone of this message while strictly adhering to ONLY the observed facts. "
+                    "NEVER add any new factual claims, performance metrics, store launches, or unverified findings."
+                )
+                prompt = f"Refine the following draft while preserving all exact factual constraints:\n\n{d.body}"
+                refined_text = await ai_provider.generate_text(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    max_tokens=300,
+                    temperature=0.3,
+                )
+                if refined_text and len(refined_text.strip()) > 20:
+                    val_res = MessageValidator.validate_draft(
+                        body=refined_text.strip(),
+                        context=context,
+                        channel=channel,
+                    )
+                    if val_res.valid:
+                        refined_draft = OutreachDraftResult(
+                            variant=d.variant,
+                            channel=d.channel,
+                            subject=d.subject,
+                            body=refined_text.strip(),
+                            personalization_level=d.personalization_level,
+                            angle=d.angle,
+                            service=d.service,
+                            cta_text=d.cta_text,
+                            cta_category=d.cta_category,
+                            quality_score=val_res.score,
+                            validation_result=val_res,
+                            evidence_items=d.evidence_items,
+                            status=DraftStatus.READY_FOR_APPROVAL,
+                        )
+                        refined_results.append(refined_draft)
+                        continue
+            except Exception:
+                pass  # Fall back cleanly to deterministic draft
+            refined_results.append(d)
+
+        return refined_results
+
+    @classmethod
     def _generate_single_variant(
         cls,
         variant: str,
@@ -170,19 +233,21 @@ class MessageGenerator:
         val_prop: str,
         is_shorter: bool,
     ) -> str:
+        has_inspected_site = bool(context.website_url and (context.website_audit or context.verified_observations))
         obs_ref = ""
         if context.verified_observations:
             obs_ref = f"noticed your recent update on {context.verified_observations[0]}"
-        elif context.website_url:
-            obs_ref = f"saw you recently launched the {company_name} online store"
+        elif has_inspected_site:
+            obs_ref = f"noticed {company_name}'s web presence"
         else:
             obs_ref = f"noticed your work on {company_name}"
 
         pain_sentence = ""
         if primary_pain:
-            pain_sentence = f" I also noticed {primary_pain.lower().rstrip('.')} on the mobile site."
-        elif "ECOMMERCE" in context.recommended_service:
-            pain_sentence = " I also noticed a couple areas in the mobile shopping flow that could be smoother."
+            if has_inspected_site:
+                pain_sentence = f" I also noticed {primary_pain.lower().rstrip('.')} on the site."
+            else:
+                pain_sentence = f" I also noted your point regarding {primary_pain.lower().rstrip('.')}."
 
         if is_shorter or variant == "A":
             # Direct
@@ -196,14 +261,15 @@ class MessageGenerator:
             return (
                 f"{contact_ref}, {obs_ref}. "
                 f"Really like what you're putting together for {company_name}.{pain_sentence} "
-                f"If you're actively refining the storefront, happy to share a few specific ideas."
+                f"If you're actively refining the experience, happy to share a few specific ideas."
             )
         else:
             # Insight-led
+            followup_offer = "the key technical observations I noted if helpful." if (primary_pain and has_inspected_site) else "our technical playbook if helpful."
             return (
-                f"{contact_ref}, was looking over {company_name}'s public web storefront.{pain_sentence} "
+                f"{contact_ref}, was looking over {company_name}'s public presence.{pain_sentence} "
                 f"We focus on {val_prop.lower()} "
-                f"Happy to send over the 3 biggest friction points I noticed on mobile if helpful."
+                f"Happy to send over {followup_offer}"
             )
 
     @classmethod
@@ -215,11 +281,11 @@ class MessageGenerator:
         val_prop: str,
         is_shorter: bool,
     ) -> str:
-        pain_mention = primary_pain or "mobile navigation friction and checkout drop-off"
+        pain_mention = primary_pain.lower() if primary_pain else "asset optimization and layout structure"
         return (
-            f"A few key areas I'd check first are {pain_mention.lower()}. "
+            f"A few key areas I'd check first are {pain_mention}. "
             f"Often streamlining asset sizes and clarifying product CTAs makes a measurable difference. "
-            f"If you'd like, I can take a deeper look at the public storefront and point out the specific friction points."
+            f"If you'd like, I can take a closer look and share specific ideas."
         )
 
     @classmethod
@@ -233,10 +299,23 @@ class MessageGenerator:
         val_prop: str,
         is_shorter: bool,
     ) -> str:
-        pain_section = f"While reviewing the site, I noticed {primary_pain.lower().rstrip('.')}." if primary_pain else f"While checking out {company_name}, I spotted a few potential friction points in the user journey."
+        has_inspected_site = bool(context.website_url and (context.website_audit or context.verified_observations))
+        intro = (
+            f"I was recently checking out {company_name} and took a close look at your public web experience."
+            if has_inspected_site
+            else f"I was recently reviewing {company_name}'s public digital presence."
+        )
+
+        if primary_pain and has_inspected_site:
+            pain_section = f"While reviewing the site, I noticed {primary_pain.lower().rstrip('.')}."
+        elif primary_pain:
+            pain_section = f"Based on your public requirements, addressing {primary_pain.lower().rstrip('.')} is often a critical priority."
+        else:
+            pain_section = "At TechVerse AI, we engineer high-performance web systems and digital experiences."
+
         return (
             f"{contact_ref}\n\n"
-            f"I was recently checking out {company_name} and took a close look at your public web experience.\n\n"
+            f"{intro}\n\n"
             f"{pain_section} At TechVerse AI, we specialize in high-impact {context.recommended_service.lower().replace('_', ' ')} to {val_prop.lower()}\n\n"
             f"Would it make sense to share a quick technical breakdown with your team?\n\n"
             f"Best regards,\n"
@@ -254,7 +333,14 @@ class MessageGenerator:
         val_prop: str,
         is_shorter: bool,
     ) -> str:
-        pain_mention = f" I noticed {primary_pain.lower().rstrip('.')} on the mobile site." if primary_pain else ""
+        has_inspected_site = bool(context.website_url and (context.website_audit or context.verified_observations))
+        pain_mention = ""
+        if primary_pain:
+            if has_inspected_site:
+                pain_mention = f" I noticed {primary_pain.lower().rstrip('.')} on the mobile site."
+            else:
+                pain_mention = f" I noticed your focus on {primary_pain.lower().rstrip('.')}."
+
         return (
             f"{contact_ref}, came across {company_name}'s digital presence.{pain_mention} "
             f"We build high-performance web experiences at TechVerse AI to {val_prop.lower()} "

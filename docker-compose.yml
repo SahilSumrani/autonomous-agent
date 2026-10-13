@@ -32,6 +32,29 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: techverse_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      POSTGRES_SERVER: postgres
+      REDIS_HOST: redis
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./services:/app/services
+      - ./packages:/app/packages
+      - ./apps/web:/app/apps/web
+
 volumes:
   postgres_data:
     driver: local

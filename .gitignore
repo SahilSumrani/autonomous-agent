@@ -59,8 +59,12 @@ $RECYCLE.BIN/
 # Logs & Databases
 *.log
 *.sqlite3
+*.sqlite
+*.db
 postgres_data/
 redis_data/
 
 # e2e Runner Output & Cache
 .e2e/
+.agents/
+apps/browser-extension/dist/

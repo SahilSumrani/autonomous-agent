@@ -9,6 +9,11 @@ GatewayConnection.setCommandCallback(async (command) => {
   await CommandRouter.executeCommand(command);
 });
 
+// Expose on globalThis for diagnostics & inspection
+(globalThis as any).SessionManager = SessionManager;
+(globalThis as any).GatewayConnection = GatewayConnection;
+(globalThis as any).CommandRouter = CommandRouter;
+
 // Auto-connect on startup if session credentials exist
 chrome.runtime.onStartup.addListener(async () => {
   const session = await SessionManager.getSessionData();
@@ -37,6 +42,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Listen for tab closure to clean up dedicated agent tab
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === CommandRouter.getDedicatedTabId()) {
+    CommandRouter.setDedicatedTabId(null);
+  }
+});
+
 // Runtime message listener (from content script or popup)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const { type, payload } = message;
@@ -56,6 +68,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           GatewayConnection.sendFrame("SECURITY_ALERT", payload);
         }
         SessionManager.setState(ExtensionSessionState.BLOCKED);
+        await CommandRouter.setControlState({
+          active: true,
+          status: "BLOCKED",
+          action_text: `AI Agent • Blocked: ${payload.reason || payload.challenge_type}`,
+          reason: payload.reason,
+        });
         sendResponse({ received: true });
         break;
       }
@@ -72,7 +90,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case "DISCONNECT_SESSION": {
         GatewayConnection.disconnect();
         await SessionManager.clearSessionData();
+        await CommandRouter.setControlState({ active: false, status: "NORMAL" });
         sendResponse({ success: true });
+        break;
+      }
+
+      case "RECONNECT_GATEWAY": {
+        const session = await SessionManager.getSessionData();
+        if (session) {
+          await GatewayConnection.connect();
+          sendResponse({ success: true, is_connected: GatewayConnection.isConnected() });
+        } else {
+          sendResponse({ success: false, error: "No active session to reconnect" });
+        }
         break;
       }
 

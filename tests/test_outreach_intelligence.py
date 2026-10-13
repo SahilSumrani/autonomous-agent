@@ -382,6 +382,14 @@ async def test_outreach_rejection_and_regeneration(client: AsyncClient, test_db_
         status=LeadStatus.QUALIFIED.value,
         recommended_service="BUSINESS_WEBSITE",
     )
+    contact = Contact(
+        id=uuid.uuid4(),
+        organization_id=ORG_A,
+        first_name="Lars",
+        email="lars@nordicminimalists.com",
+    )
+    test_db_session.add(contact)
+    lead.contact_id = contact.id
     test_db_session.add(lead)
     await test_db_session.commit()
 

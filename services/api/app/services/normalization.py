@@ -9,6 +9,141 @@ TRACKING_PARAMS = {
     "mc_cid", "mc_eid"
 }
 
+# Platform-owned domains that can never become a company/lead domain
+PLATFORM_OWNED_DOMAINS = {
+    "linkedin.com",
+    "reddit.com",
+    "threads.net",
+    "threads.com",
+    "instagram.com",
+    "facebook.com",
+    "x.com",
+    "twitter.com",
+    "google.com",
+    "bing.com",
+    "duckduckgo.com",
+    "youtube.com",
+    "tiktok.com",
+    "apple.com",
+    "linktr.ee",
+    "t.co",
+}
+
+# Public free webmail and email-provider domains that cannot represent a company website
+EMAIL_PROVIDER_DOMAINS = {
+    "gmail.com",
+    "googlemail.com",
+    "yahoo.com",
+    "ymail.com",
+    "hotmail.com",
+    "outlook.com",
+    "live.com",
+    "msn.com",
+    "icloud.com",
+    "me.com",
+    "mac.com",
+    "protonmail.com",
+    "proton.me",
+    "mail.com",
+    "email.com",
+    "aol.com",
+    "zoho.com",
+    "yandex.com",
+    "gmx.com",
+    "gmx.net",
+    "fastmail.com",
+}
+
+# Generic placeholder, template, and test domains
+PLACEHOLDER_DOMAINS = {
+    "example.com",
+    "example.org",
+    "example.net",
+    "example.edu",
+    "test.com",
+    "sample.com",
+    "placeholder.com",
+    "yoursite.com",
+    "mysite.com",
+    "website.com",
+    "domain.com",
+    "yourdomain.com",
+    "localhost",
+}
+
+DISALLOWED_BUSINESS_DOMAINS = PLATFORM_OWNED_DOMAINS | EMAIL_PROVIDER_DOMAINS | PLACEHOLDER_DOMAINS
+
+
+def is_platform_owned_domain(domain: Optional[str]) -> bool:
+    """Check if domain belongs to a known platform/social network."""
+    if not domain:
+        return False
+    d = domain.lower().strip()
+    if d.startswith("www."):
+        d = d[4:]
+    return any(d == pod or d.endswith(f".{pod}") for pod in PLATFORM_OWNED_DOMAINS)
+
+
+def is_disallowed_business_domain(domain: Optional[str]) -> bool:
+    """Check if domain is a platform, public email provider, or placeholder domain."""
+    if not domain:
+        return True
+    d = domain.lower().strip()
+    if d.startswith("www."):
+        d = d[4:]
+    return any(d == bad or d.endswith(f".{bad}") for bad in DISALLOWED_BUSINESS_DOMAINS)
+
+
+def clean_social_post_text(text: Optional[str], author_hint: Optional[str] = None) -> str:
+    """
+    Clean extracted social media (Threads, Reddit, etc.) post text by removing
+    scraped UI chrome such as Follow buttons, inline audio alerts, and trailing
+    Like/Reply/Repost/Share counters.
+    """
+    if not text:
+        return ""
+    t = text.strip()
+
+    # 1. Author-specific header strip if author hint provided
+    if author_hint:
+        h = author_hint.lstrip("@").strip()
+        if h:
+            t = re.sub(
+                rf"^Follow\s*{re.escape(h)}\s*(?:\d{{1,2}}/\d{{1,2}}/\d{{2,4}}|\d+[mhdws]|yesterday|just now)?\s*(?:More)?\s*",
+                "",
+                t,
+                flags=re.IGNORECASE,
+            )
+
+    # 2. Generic leading Follow artifact strip
+    t = re.sub(
+        r"^Follow\s*[a-zA-Z0-9_\.]*?(?:(?:\d{1,2}/\d{1,2}/\d{2,4})|(?:\d+[mhdws])|yesterday|just now)?\s*(?:More)?\s*",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(r"^Follow\s+[a-zA-Z0-9_\.]+\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"^Follow\s*", "", t, flags=re.IGNORECASE)
+
+    # 3. Inline platform tags
+    t = re.sub(r"\b(Audio is muted|Audio unavailable|Log in to like|Log in)\b", "", t, flags=re.IGNORECASE)
+
+    # 4. Trailing action buttons (Like, Reply, Repost, Share with optional counts)
+    t = re.sub(
+        r"(?:\s*[1-9]\d{0,1}/[1-9]\d{0,1}\s*)?(?:\s*(?:Like|Reply|Repost|Share)\s*\d*)+$",
+        "",
+        t,
+        flags=re.IGNORECASE,
+    )
+    t = re.sub(r"\s*[1-9]\d{0,1}/[1-9]\d{0,1}$", "", t)
+    t = re.sub(r"\s*More$", "", t, flags=re.IGNORECASE)
+
+    # Normalize repeated whitespace while preserving newlines
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in t.split("\n")]
+    t = "\n".join(line for line in lines if line)
+    return t.strip()
+
+
 # Common legal suffixes for company name normalization
 LEGAL_SUFFIXES = [
     r"\binc\.?$", r"\bllc\.?$", r"\bltd\.?$", r"\bcorp\.?$", r"\bcorporation$",

@@ -2,12 +2,14 @@
 
 **Current Status**:
 - Phase 0–7 implementation: COMPLETE
-- Phase 0–7 production validation: PASS (Certified Production-Ready)
-- Phase 8: NOT STARTED
+- Phase 0–7 hardening: COMPLETE & PASS (150/150 tests passing)
+- Autonomous Browser Prospecting Agent: COMPLETE & VERIFIED (160/160 tests passing)
+- Human-In-The-Loop Boundary: ENFORCED (Zero autonomous outreach sending)
 
-**Last Updated**: 2026-10-07  
+**Last Updated**: 2026-10-08  
 **Owner / Engineer**: Sahil (Backend, AI, Agent Systems, Infrastructure)  
-**Verification**: 95/95 tests passing monorepo-wide (0 regressions, 0 errors)
+**Verification**: 160/160 tests passing monorepo-wide (0 regressions, 0 errors)
+
 
 ---
 
@@ -150,6 +152,19 @@
   - [x] Complete REST API suite (`/api/v1/conversations/...` and `/api/v1/leads/{lead_id}/conversations`)
   - [x] Real-time Redis event dispatching for 13 conversation lifecycle events
   - [x] Comprehensive test suite (12 tests, 83/83 passing monorepo-wide, 0 regressions)
+- [x] **Autonomous Browser Prospecting Agent** (Completed & Verified):
+  - [x] First-class persistent models: `ProspectingJob`, `ProspectCandidate`, `ProspectObservation` with Alembic migration `0008_prospecting_agent_tables.py`
+  - [x] Source Adapter architecture: `InstagramSource`, `RedditSource`, `ThreadsSource`, `WebsiteSource`, `WebSearchSource` with challenge detection and normalized dedup keys
+  - [x] Autonomous Browser Command Driver (`BrowserCommandDriver`): bounded navigation, reading, clicking, and controlled scrolling with content hashing and early halt on stagnant content
+  - [x] Business Extractor (`BusinessExtractor`): truthful extraction of company name, domain, social handle, category, public emails/phones with zero hallucination
+  - [x] Signal Engine & Anti-False-Positive Filtering: buying intent vs technical flaws weighting; disqualifying patterns for student homework, competitors, job seekers
+  - [x] Real Website Research: audits real candidate website content via browser navigation; marks unreachable sites `UNAVAILABLE` with zero fake findings
+  - [x] Prospecting Orchestrator state machine: complete loop (START -> DISCOVER -> READ -> SCROLL -> OBSERVE -> QUALIFY -> RESEARCH -> SCORE -> CRM LEAD -> OUTREACH DRAFT -> READY_FOR_APPROVAL -> STOP)
+  - [x] Strict Human-In-The-Loop Boundary: zero autonomous external messaging/commenting/sending; drafts stop strictly at `READY_FOR_APPROVAL`
+  - [x] Platform security barrier detection: halts immediately and records `BLOCKED` status when CAPTCHAs, bot challenges, or rate limits are encountered
+  - [x] Background Worker (`ProspectingWorker`): asynchronous execution outside HTTP loop, restart-resilient, transitions to `WAITING_FOR_USER` on browser disconnect without losing job state
+  - [x] REST API suite (`POST/GET /api/v1/prospecting/jobs`, pause, resume, cancel, candidates, observations)
+  - [x] 10/10 new automated tests in `tests/test_autonomous_prospecting.py`, 160/160 tests passing monorepo-wide
 
 ---
 
@@ -161,4 +176,6 @@
 - **ADR-005**: Evidence-first deterministic quality validation and human-in-the-loop approval gate. Outreach generation is strictly evidence-backed, requires quality score >= 75 for approval readiness, and Phase 5 stops strictly at `APPROVED` with zero autonomous external sending.
 - **ADR-006**: Chrome Extension execution runtime with zero credential exfiltration. The extension operates as an authorized execution runtime via short-lived pairing tokens over WebSocket. Arbitrary JavaScript execution is prohibited; all external outreach actions require `APPROVED` draft status plus visible user confirmation in the extension popup. Uncertain delivery transitions to `DELIVERY_UNKNOWN` without automated retry.
 - **ADR-007**: Conversation Intelligence & Reply Agent safety boundaries. External prospect inbound communications are treated as untrusted input. Prompt injection defanging is enforced at ingestion. Intent classifications never trigger autonomous commitments. Replies are generated in 3 bounded variants, verified against 8 quality dimensions and prohibited commitments (no autonomous discounts, pricing guarantees, or legal promises), and require human review approval prior to dispatch via the Phase 6 Chrome Browser Gateway.
+- **ADR-008**: Autonomous Browser Prospecting Agent boundaries and execution model. The agent drives the user's authorized browser through structured WebSocket commands (`OPEN_PAGE`, `READ_PAGE`, `SCROLL`, `CLICK`) under strict multi-tenant isolation, hard budgets, and deduplication guarantees. Stealth browser evasion, fingerprint spoofing, cookie extraction, credential harvesting, and CAPTCHA bypass are strictly prohibited; platforms presenting security barriers transition the job to `BLOCKED` and allow human takeover. Disconnections transition the job to `WAITING_FOR_USER` without losing candidates or progress. The agent performs truthful extraction, genuine website research, deterministic scoring, and evidence-grounded outreach drafting, but halts strictly at `READY_FOR_APPROVAL` with zero autonomous outbound communication.
+
 

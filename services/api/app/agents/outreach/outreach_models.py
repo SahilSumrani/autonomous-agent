@@ -56,6 +56,7 @@ class OutreachContext(BaseModel):
     website_url: Optional[str] = None
     website_findings: Dict[str, Any] = Field(default_factory=dict)
     website_opportunities: Dict[str, Any] = Field(default_factory=dict)
+    website_audit: Optional[Dict[str, Any]] = None
 
     pain_points: List[PainPoint] = Field(default_factory=list)
     opportunity_points: List[str] = Field(default_factory=list)

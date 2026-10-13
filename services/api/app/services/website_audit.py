@@ -14,17 +14,17 @@ class WebsiteAuditEngine:
         if not pages:
             return {
                 "scores": AuditScores(
-                    website_health_score=50,
-                    performance_score=50,
-                    mobile_score=50,
-                    ux_score=50,
-                    seo_score=50,
-                    conversion_score=50,
-                    accessibility_score=50,
+                    website_health_score=0,
+                    performance_score=0,
+                    mobile_score=0,
+                    ux_score=0,
+                    seo_score=0,
+                    conversion_score=0,
+                    accessibility_score=0,
                 ),
                 "positive_findings": [],
-                "negative_findings": ["No pages could be analyzed."],
-                "recommendations": ["Re-attempt website crawl or verify domain connectivity."],
+                "negative_findings": [],
+                "recommendations": [],
                 "ecommerce_detected": False,
                 "ecommerce_platform": None,
             }

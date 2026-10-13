@@ -38,6 +38,10 @@ export class OriginPolicy {
         return { safe: false, reason: `Unsupported protocol: ${parsed.protocol}` };
       }
 
+      if (parsed.username || parsed.password) {
+        return { safe: false, reason: "Credentials in URL are prohibited" };
+      }
+
       const hostname = parsed.hostname.toLowerCase();
 
       if (this.BLOCKED_HOSTS.has(hostname)) {

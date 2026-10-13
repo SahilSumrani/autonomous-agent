@@ -8,7 +8,9 @@ from services.api.app.agents.research.research_models import (
     AuditScores,
     EvidenceCategory,
     PageAnalysisResult,
+    ResearchDataSource,
     ResearchEvidence,
+    ResearchStatus,
     TechnologyFinding,
     WebsiteOpportunityBreakdown,
     WebsiteResearchSummary,
@@ -32,20 +34,82 @@ class ResearchEngine:
         website_url: str,
         pages_data: Optional[List[Dict[str, Any]]] = None,
         company_name: Optional[str] = None,
+        data_source: Optional[str] = None,
     ) -> Dict[str, Any]:
         sanitized_url = validate_and_sanitize_target_url(website_url)
         evidence_collector = EvidenceCollector()
 
-        # If pages_data is not provided, use default mock homepage
+        # If pages_data is empty or not provided, real research is unavailable.
+        # NEVER invent data or substitute fake mock pages.
         if not pages_data:
-            pages_data = [
-                {
-                    "url": sanitized_url,
-                    "html": "<html><head><title>Home</title></head><body><h1>Welcome</h1><p>Our website</p></body></html>",
-                    "visible_text": "Welcome to our website. We provide quality services.",
-                    "links": [],
-                }
-            ]
+            business_title = company_name or urlparse(sanitized_url).netloc
+            scores = AuditScores(
+                website_health_score=0,
+                performance_score=0,
+                mobile_score=0,
+                ux_score=0,
+                seo_score=0,
+                conversion_score=0,
+                accessibility_score=0,
+            )
+            opp_breakdown = WebsiteOpportunityBreakdown(
+                performance_opportunity=0,
+                mobile_opportunity=0,
+                ux_opportunity=0,
+                seo_opportunity=0,
+                conversion_opportunity=0,
+                ecommerce_opportunity=0,
+                tech_modernization_opportunity=0,
+                total_opportunity_score=0,
+                reasons=[],
+            )
+            research_summary = WebsiteResearchSummary(
+                website_status=ResearchStatus.RESEARCH_UNAVAILABLE.value,
+                business_summary=f"Public website resolved at {sanitized_url}, but page content is unavailable.",
+                technology_summary="None observed",
+                strengths=[],
+                weaknesses=[],
+                opportunities=[],
+                critical_findings=[],
+                recommended_service="None",
+                alternative_services=[],
+                evidence=[],
+                confidence=0.0,
+            )
+            return {
+                "status": ResearchStatus.RESEARCH_UNAVAILABLE.value,
+                "data_source": ResearchDataSource.UNAVAILABLE_DATA.value,
+                "website_url": sanitized_url,
+                "pages_analyzed": 0,
+                "pages_failed": 0,
+                "technology_stack": [],
+                "cms": None,
+                "frontend_framework": None,
+                "backend_technology": None,
+                "analytics_tools": [],
+                "payment_provider": None,
+                "hosting_provider": None,
+                "cdn": None,
+                "ecommerce_platform": None,
+                "scores": scores,
+                "opportunity_breakdown": opp_breakdown,
+                "positive_findings": [],
+                "negative_findings": [],
+                "recommendations": [],
+                "summary": f"Research unavailable for {business_title}: no observed or supplied page content.",
+                "research_summary": research_summary,
+                "analyzed_pages": [],
+                "generated_signals": [],
+                "all_evidence": [],
+                "confidence": 0.0,
+            }
+
+        # Resolve data source category: OBSERVED_DATA vs USER_SUPPLIED_DATA
+        effective_data_source = data_source or (
+            ResearchDataSource.OBSERVED_DATA.value
+            if any(p.get("source_type") in ("OBSERVED_DATA", "BROWSER_OBSERVATION") or p.get("is_observed") for p in pages_data)
+            else ResearchDataSource.USER_SUPPLIED_DATA.value
+        )
 
         # 1. Analyze all pages
         analyzed_pages: List[PageAnalysisResult] = []
@@ -207,6 +271,8 @@ class ResearchEngine:
         )
 
         return {
+            "status": ResearchStatus.COMPLETED.value,
+            "data_source": effective_data_source,
             "website_url": sanitized_url,
             "pages_analyzed": len(analyzed_pages),
             "pages_failed": 0,

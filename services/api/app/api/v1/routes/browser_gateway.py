@@ -116,9 +116,19 @@ async def pair_browser_extension(
             browser_id=data.browser_id,
             client_version=data.client_version,
         )
+        # Persist token in AgentSession metadata so extension reconnects survive server restarts
+        stmt_sess = select(AgentSession).where(AgentSession.id == session_id)
+        sess_record = (await db.execute(stmt_sess)).scalar_one_or_none()
+        if sess_record:
+            meta = dict(sess_record.metadata_json or {})
+            meta["session_token"] = pair_result["token"]
+            sess_record.metadata_json = meta
+            await db.commit()
+
         return PairResponse(**pair_result)
     except BrowserGatewayException as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
 
 
 @router.post("/revoke")
@@ -153,30 +163,37 @@ async def get_browser_status(
     db: AsyncSession = Depends(get_db),
     org_id: uuid.UUID = Depends(get_current_org_id),
 ) -> BrowserStatusResponse:
-    """Inspect active browser extension connection status and page state."""
-    if session_id:
+    target_session_id = session_id
+    if not target_session_id:
+        for sid, conn_org in browser_gateway._session_orgs.items():
+            if conn_org == org_id and browser_gateway.is_connected(sid):
+                target_session_id = sid
+                break
+
+    if target_session_id:
         stmt = select(AgentSession).where(
-            AgentSession.id == session_id,
+            AgentSession.id == target_session_id,
             AgentSession.organization_id == org_id,
         )
         res = await db.execute(stmt)
         sess = res.scalar_one_or_none()
-        if not sess:
+        if not sess and session_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-        is_conn = browser_gateway.is_connected(session_id)
-        state_enum = browser_gateway.get_session_state(session_id)
-        page_state = browser_gateway.get_page_state(session_id)
+        if sess:
+            is_conn = browser_gateway.is_connected(target_session_id)
+            state_enum = browser_gateway.get_session_state(target_session_id)
+            page_state = browser_gateway.get_page_state(target_session_id)
 
-        return BrowserStatusResponse(
-            session_id=session_id,
-            organization_id=org_id,
-            is_connected=is_conn,
-            session_state=state_enum.value,
-            current_url=page_state.url if page_state else sess.current_url,
-            current_domain=page_state.origin if page_state else sess.current_domain,
-            page_type=page_state.page_type.value if page_state else None,
-        )
+            return BrowserStatusResponse(
+                session_id=target_session_id,
+                organization_id=org_id,
+                is_connected=is_conn,
+                session_state=state_enum.value,
+                current_url=page_state.url if page_state else sess.current_url,
+                current_domain=page_state.origin if page_state else sess.current_domain,
+                page_type=page_state.page_type.value if page_state else None,
+            )
 
     return BrowserStatusResponse(
         session_id=None,
@@ -184,6 +201,29 @@ async def get_browser_status(
         is_connected=False,
         session_state=ExtensionSessionState.DISCONNECTED.value,
     )
+
+
+@router.post("/command")
+async def execute_browser_command(
+    command_data: Dict[str, Any],
+    session_id: uuid.UUID = Query(...),
+    org_id: uuid.UUID = Depends(get_current_org_id),
+) -> Dict[str, Any]:
+    """Execute a validated browser command via the connected Chrome extension."""
+    if not browser_gateway.is_connected(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Browser session {session_id} is not connected",
+        )
+    cmd = BrowserCommand(
+        session_id=session_id,
+        type=BrowserCommandType(command_data["type"]),
+        payload=command_data.get("payload", {}),
+        correlation_id=command_data.get("correlation_id", str(uuid.uuid4())),
+    )
+    result = await browser_gateway.send_command(cmd, timeout_seconds=25.0, expected_org_id=org_id)
+    return result.model_dump()
+
 
 
 @router.post("/pause")
@@ -340,12 +380,55 @@ async def execute_approved_outreach(
             detail=f"Draft cannot be executed because status is {draft.status}, must be APPROVED",
         )
 
-    # 4. Check active browser connection
+    # 4. Verify browser session ownership and connection
     if not browser_gateway.is_connected(data.session_id):
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=f"Browser session {data.session_id} is not connected to Chrome extension",
         )
+
+    sess_org = browser_gateway._session_orgs.get(data.session_id)
+    if sess_org and sess_org != org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Browser session belongs to another organization",
+        )
+
+    agent_service = AgentService(db)
+    try:
+        db_sess = await agent_service.get_session(org_id, data.session_id)
+        if db_sess.organization_id != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Browser session belongs to another organization",
+            )
+    except AgentServiceException:
+        if not sess_org or sess_org != org_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Browser session {data.session_id} not found for this organization",
+            )
+
+    # Verify specific approval record if provided
+    if data.approval_id:
+        from services.api.app.models.outreach import OutreachApproval
+        appr_stmt = select(OutreachApproval).where(
+            OutreachApproval.id == data.approval_id,
+            OutreachApproval.organization_id == org_id,
+            OutreachApproval.draft_id == draft.id,
+        )
+        appr_res = await db.execute(appr_stmt)
+        approval_rec = appr_res.scalar_one_or_none()
+        if not approval_rec:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Referenced outreach approval record not found",
+            )
+        if approval_rec.status != "APPROVED":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Outreach approval record status is {approval_rec.status}, must be APPROVED",
+            )
 
     # 5. Determine recipient and build EXECUTE_APPROVED_OUTREACH command
     recipient = "Unknown"
@@ -358,8 +441,14 @@ async def execute_approved_outreach(
             if lead.contact_id:
                 contact_repo = ContactRepository(db)
                 contact = await contact_repo.get_by_id(org_id, lead.contact_id)
-                if contact and (contact.handle or contact.email or contact.full_name):
-                    recipient = contact.handle or contact.email or contact.full_name
+                if contact:
+                    recipient = (
+                        contact.instagram_username
+                        or contact.reddit_username
+                        or contact.email
+                        or contact.full_name
+                        or "Unknown"
+                    )
             if recipient == "Unknown" and lead.title and "Discovered via Browser: " in lead.title:
                 candidate = lead.title.replace("Discovered via Browser: ", "").strip()
                 if candidate.startswith("@"):
@@ -388,7 +477,11 @@ async def execute_approved_outreach(
     )
 
     # Dispatch to extension and await user confirmation & execution
-    command_result = await browser_gateway.send_command(command, timeout_seconds=30.0)
+    command_result = await browser_gateway.send_command(
+        command,
+        timeout_seconds=30.0,
+        expected_org_id=org_id,
+    )
 
     # 6. Evaluate Result
     if command_result.status == CommandExecutionStatus.DELIVERY_UNKNOWN:
@@ -489,8 +582,39 @@ async def browser_websocket_endpoint(
 
     session_record = browser_gateway.validate_session_token(token)
     if not session_record:
+        # Check database for persistent session token surviving server restart
+        from services.api.app.core.database import AsyncSessionLocal
+        from services.api.app.models.agent import SessionStatus
+        import time
+        try:
+            async with AsyncSessionLocal() as db_session:
+                stmt = select(AgentSession).where(
+                    AgentSession.status != SessionStatus.COMPLETED.value
+                )
+                res = await db_session.execute(stmt)
+                for sess in res.scalars():
+                    meta = sess.metadata_json or {}
+                    if meta.get("session_token") == token:
+                        session_record = {
+                            "session_id": sess.id,
+                            "organization_id": sess.organization_id,
+                            "user_id": sess.user_id,
+                            "browser_id": sess.browser_id,
+                            "client_version": meta.get("client_version", "2.0.0"),
+                            "expires_at": time.time() + 86400,
+                        }
+                        browser_gateway._session_tokens[token] = session_record
+                        browser_gateway._session_orgs[sess.id] = sess.organization_id
+                        browser_gateway._session_users[sess.id] = sess.user_id
+                        browser_gateway._session_states[sess.id] = ExtensionSessionState.AUTHORIZED
+                        break
+        except Exception:
+            pass
+
+    if not session_record:
         await websocket.close(code=4003, reason="Invalid or expired session token")
         return
+
 
     session_id = session_record["session_id"]
     org_id = session_record["organization_id"]

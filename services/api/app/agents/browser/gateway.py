@@ -55,8 +55,8 @@ class BrowserGatewayManager:
         self._session_orgs: Dict[uuid.UUID, uuid.UUID] = {}
         # session_id -> user_id
         self._session_users: Dict[uuid.UUID, Optional[uuid.UUID]] = {}
-        # command_id -> asyncio.Future[BrowserCommandResult]
-        self._pending_commands: Dict[uuid.UUID, asyncio.Future] = {}
+        # command_id -> {"future": asyncio.Future, "session_id": uuid.UUID, "org_id": uuid.UUID, "issued_at": float}
+        self._pending_commands: Dict[uuid.UUID, Dict[str, Any]] = {}
         # session_id -> latest PageState
         self._page_states: Dict[uuid.UUID, PageState] = {}
         # session_id -> ExtensionSessionState
@@ -66,6 +66,8 @@ class BrowserGatewayManager:
         self._pairing_challenges: Dict[str, Dict[str, Any]] = {}
         # Active session tokens: token -> {session_id, org_id, user_id, expires_at}
         self._session_tokens: Dict[str, Dict[str, Any]] = {}
+        # Revoked session set
+        self._revoked_sessions: Set[uuid.UUID] = set()
 
     # --- Pairing & Token Authentication ---
 
@@ -109,9 +111,9 @@ class BrowserGatewayManager:
         session_id: uuid.UUID,
         browser_id: str,
         client_version: str = "2.0.0",
-        token_ttl_seconds: int = 86400,
+        token_ttl_seconds: int = 86400 * 7,
     ) -> Dict[str, Any]:
-        """Verify single-use pairing code and issue a short-lived extension session token."""
+        """Verify single-use pairing code and issue a persistent cryptographically signed extension session token."""
         code = pairing_code.strip().upper()
         record = self._pairing_challenges.get(code)
         if not record:
@@ -124,7 +126,15 @@ class BrowserGatewayManager:
         # Invalidate pairing challenge immediately (single use)
         self._pairing_challenges.pop(code, None)
 
-        session_token = f"tv_sess_{secrets.token_urlsafe(48)}"
+        from services.api.app.core.auth import create_browser_session_token
+        session_token = create_browser_session_token(
+            session_id=session_id,
+            org_id=record["organization_id"],
+            user_id=record["user_id"],
+            browser_id=browser_id,
+            client_version=client_version,
+            expires_in_seconds=token_ttl_seconds,
+        )
         expires_at = time.time() + token_ttl_seconds
 
         token_record = {
@@ -154,15 +164,33 @@ class BrowserGatewayManager:
         if not token:
             return None
         record = self._session_tokens.get(token)
-        if not record:
+        if record:
+            if time.time() > record["expires_at"]:
+                self._session_tokens.pop(token, None)
+                return None
+            if record.get("session_id") in self._revoked_sessions:
+                return None
+            return record
+
+        # Fallback to cryptographic signature verification
+        try:
+            from services.api.app.core.auth import verify_browser_session_token
+            decoded = verify_browser_session_token(token)
+            sess_id = decoded["session_id"]
+            if sess_id in self._revoked_sessions:
+                return None
+            self._session_tokens[token] = decoded
+            self._session_orgs[sess_id] = decoded["organization_id"]
+            self._session_users[sess_id] = decoded.get("user_id")
+            self._session_states[sess_id] = ExtensionSessionState.AUTHORIZED
+            return decoded
+        except Exception as e:
+            logger.debug(f"Session token verification error: {e}")
             return None
-        if time.time() > record["expires_at"]:
-            self._session_tokens.pop(token, None)
-            return None
-        return record
 
     def revoke_session(self, session_id: uuid.UUID) -> bool:
         """Revoke all tokens and disconnect session."""
+        self._revoked_sessions.add(session_id)
         tokens_to_remove = [
             t for t, r in self._session_tokens.items() if r.get("session_id") == session_id
         ]
@@ -244,15 +272,22 @@ class BrowserGatewayManager:
         self,
         command: BrowserCommand,
         timeout_seconds: float = 15.0,
+        expected_org_id: Optional[uuid.UUID] = None,
     ) -> BrowserCommandResult:
         """
         Send a validated structured command to the Chrome extension and await result.
-        Enforces SSRF prevention, tool registry schema validation, and timeouts.
+        Enforces organization isolation, SSRF prevention, tool registry schema validation, and timeouts.
         """
         session_id = command.session_id
         ws = self._active_connections.get(session_id)
         if not ws:
             raise SessionNotConnectedException(f"Browser session {session_id} is not connected")
+
+        org_id = self._session_orgs.get(session_id)
+        if expected_org_id and org_id and org_id != expected_org_id:
+            raise CommandValidationException(
+                f"Cross-organization session command rejected: session belongs to org {org_id}, not {expected_org_id}"
+            )
 
         # 1. Tool registry check
         tool_name = command.type.value.lower()
@@ -263,13 +298,13 @@ class BrowserGatewayManager:
 
         # 2. SSRF check for navigation commands
         if command.type in (BrowserCommandType.OPEN_PAGE, BrowserCommandType.NAVIGATE):
-            target_url = command.payload.get("url")
+            target_url = command.payload.get("url") or command.payload.get("target_url")
             if target_url:
                 try:
                     safe_url = validate_and_sanitize_target_url(target_url)
                     command.payload["url"] = safe_url
+                    command.payload["target_url"] = safe_url
                 except SSRFValidationError as e:
-                    org_id = self._session_orgs.get(session_id)
                     if org_id:
                         await EventDispatcher.dispatch(
                             event_type="browser.action.blocked",
@@ -290,10 +325,15 @@ class BrowserGatewayManager:
                         correlation_id=command.correlation_id,
                     )
 
-        # 3. Create tracking future
+        # 3. Create tracking future bound to session and organization
         loop = asyncio.get_running_loop()
         future: asyncio.Future[BrowserCommandResult] = loop.create_future()
-        self._pending_commands[command.command_id] = future
+        self._pending_commands[command.command_id] = {
+            "future": future,
+            "session_id": session_id,
+            "org_id": org_id,
+            "issued_at": time.time(),
+        }
 
         org_id = self._session_orgs.get(session_id)
         if org_id:
@@ -381,25 +421,35 @@ class BrowserGatewayManager:
             if command_id_raw:
                 try:
                     cmd_id = uuid.UUID(str(command_id_raw))
-                    future = self._pending_commands.pop(cmd_id, None)
-                    if future and not future.done():
-                        status_str = payload.get("status", "SUCCESS")
-                        status_enum = (
-                            CommandExecutionStatus(status_str)
-                            if status_str in CommandExecutionStatus.__members__
-                            else CommandExecutionStatus.SUCCESS
-                        )
-                        result = BrowserCommandResult(
-                            command_id=cmd_id,
-                            session_id=session_id,
-                            success=payload.get("success", True),
-                            status=status_enum,
-                            result=payload.get("result", {}),
-                            error=payload.get("error"),
-                            duration_ms=payload.get("duration_ms", 0.0),
-                            correlation_id=payload.get("correlation_id", ""),
-                        )
-                        future.set_result(result)
+                    cmd_record = self._pending_commands.get(cmd_id)
+                    if cmd_record:
+                        # Verify session ownership: only the targeted session may resolve the command
+                        if cmd_record.get("session_id") != session_id:
+                            logger.warning(
+                                f"Cross-session result injection attempt blocked: cmd_id={cmd_id}, "
+                                f"target_session={cmd_record.get('session_id')}, reporting_session={session_id}"
+                            )
+                            return
+                        self._pending_commands.pop(cmd_id, None)
+                        future = cmd_record.get("future")
+                        if future and not future.done():
+                            status_str = payload.get("status", "SUCCESS")
+                            status_enum = (
+                                CommandExecutionStatus(status_str)
+                                if status_str in CommandExecutionStatus.__members__
+                                else CommandExecutionStatus.SUCCESS
+                            )
+                            result = BrowserCommandResult(
+                                command_id=cmd_id,
+                                session_id=session_id,
+                                success=payload.get("success", True),
+                                status=status_enum,
+                                result=payload.get("result", {}),
+                                error=payload.get("error"),
+                                duration_ms=payload.get("duration_ms", 0.0),
+                                correlation_id=payload.get("correlation_id", ""),
+                            )
+                            future.set_result(result)
                 except Exception as e:
                     logger.error(f"Error resolving command result: {e}")
 
@@ -436,6 +486,27 @@ class BrowserGatewayManager:
                     },
                     organization_id=org_id,
                 )
+
+                # Persist observation and invoke downstream processing pipeline
+                url = payload.get("url") or ""
+                visible_text = payload.get("visible_text") or ""
+                if url and visible_text:
+                    try:
+                        from services.api.app.core.database import async_session_factory
+                        from services.api.app.services.agent_service import AgentService
+
+                        async with async_session_factory() as db_session:
+                            agent_svc = AgentService(db_session)
+                            await agent_svc.observe_and_process_page(
+                                org_id=org_id,
+                                session_id=session_id,
+                                url=url,
+                                visible_text=visible_text,
+                                recipient_handle=payload.get("recipient_handle"),
+                                profile_url=payload.get("profile_url"),
+                            )
+                    except Exception as e:
+                        logger.warning(f"Error processing browser observation pipeline: {e}")
 
         elif frame_type == "STATUS_UPDATE":
             status_str = payload.get("status")
@@ -474,19 +545,21 @@ class BrowserGatewayManager:
                 )
 
     def _cancel_session_commands(self, session_id: uuid.UUID, reason: str) -> None:
-        """Cancel all pending command futures for this session."""
+        """Cancel only pending command futures belonging to this specific session."""
         cancelled_ids = []
-        for cmd_id, future in list(self._pending_commands.items()):
-            if not future.done():
-                result = BrowserCommandResult(
-                    command_id=cmd_id,
-                    session_id=session_id,
-                    success=False,
-                    status=CommandExecutionStatus.CANCELLED,
-                    error=reason,
-                    correlation_id=str(uuid.uuid4()),
-                )
-                future.set_result(result)
+        for cmd_id, cmd_record in list(self._pending_commands.items()):
+            if cmd_record.get("session_id") == session_id:
+                future = cmd_record.get("future")
+                if future and not future.done():
+                    result = BrowserCommandResult(
+                        command_id=cmd_id,
+                        session_id=session_id,
+                        success=False,
+                        status=CommandExecutionStatus.CANCELLED,
+                        error=reason,
+                        correlation_id=str(uuid.uuid4()),
+                    )
+                    future.set_result(result)
                 cancelled_ids.append(cmd_id)
         for cid in cancelled_ids:
             self._pending_commands.pop(cid, None)

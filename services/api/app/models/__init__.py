@@ -33,6 +33,12 @@ from services.api.app.models.conversation import (
     ConversationReplyDraft,
     ConversationThread,
 )
+from services.api.app.models.prospecting import (
+    ProspectCandidate,
+    ProspectObservation,
+    ProspectingJob,
+    ProspectingProfile,
+)
 
 __all__ = [
     "Organization",
@@ -58,4 +64,9 @@ __all__ = [
     "ConversationMessage",
     "ConversationReplyDraft",
     "ConversationApproval",
+    "ProspectingJob",
+    "ProspectCandidate",
+    "ProspectObservation",
+    "ProspectingProfile",
 ]
+

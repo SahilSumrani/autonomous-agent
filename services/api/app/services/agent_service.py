@@ -244,6 +244,12 @@ class AgentService:
         if not approval:
             raise AgentServiceException(f"Approval request {approval_id} not found")
 
+        if approval.status == ApprovalStatus.EXECUTED.value:
+            raise ActionBlockedException("Cannot modify status: action has already been executed.")
+
+        if decision.upper() == "APPROVED" and approval.status == ApprovalStatus.REJECTED.value:
+            raise ActionBlockedException("Cannot approve an action that was previously rejected.")
+
         now = datetime.now(timezone.utc)
         if decision.upper() == "APPROVED":
             approval.status = ApprovalStatus.APPROVED.value

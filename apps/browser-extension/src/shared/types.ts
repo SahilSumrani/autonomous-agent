@@ -5,6 +5,9 @@ export enum BrowserCommandType {
   FIND_TEXT = "FIND_TEXT",
   SCROLL = "SCROLL",
   CLICK = "CLICK",
+  TYPE_TEXT = "TYPE_TEXT",
+  PRESS_KEY = "PRESS_KEY",
+  FIND_SEARCH_INPUT = "FIND_SEARCH_INPUT",
   EXTRACT_VISIBLE_CONTENT = "EXTRACT_VISIBLE_CONTENT",
   EXTRACT_LINKS = "EXTRACT_LINKS",
   GET_PAGE_STATE = "GET_PAGE_STATE",
@@ -43,6 +46,8 @@ export enum PageType {
   INSTAGRAM_PROFILE = "INSTAGRAM_PROFILE",
   REDDIT_POST = "REDDIT_POST",
   REDDIT_PROFILE = "REDDIT_PROFILE",
+  THREADS_POST = "THREADS_POST",
+  THREADS_PROFILE = "THREADS_PROFILE",
   PUBLIC_WEBSITE = "PUBLIC_WEBSITE",
   SEARCH_ENGINE = "SEARCH_ENGINE",
   OTHER = "OTHER",
@@ -93,6 +98,15 @@ export interface ObservationPayload {
   recipient_handle?: string;
   profile_url?: string;
   meta_description?: string;
+  content_units?: Array<{
+    author?: string;
+    text: string;
+    url?: string;
+    links?: string[];
+    timestamp?: string;
+  }>;
+  document_height?: number;
+  scroll_y?: number;
   timestamp: string;
 }
 
@@ -114,4 +128,22 @@ export interface PairingSessionData {
   organization_id: string;
   expires_at: string;
   backend_url: string;
+}
+
+export type OverlayStatus =
+  | "NORMAL"
+  | "RUNNING"
+  | "PAUSED"
+  | "WAITING_FOR_APPROVAL"
+  | "BLOCKED"
+  | "COMPLETED"
+  | "ERROR"
+  | "DISCONNECTED";
+
+export interface AgentControlState {
+  active: boolean;
+  status: OverlayStatus;
+  action_text: string;
+  reason?: string;
+  updated_at: number;
 }

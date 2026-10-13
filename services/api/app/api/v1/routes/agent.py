@@ -191,6 +191,8 @@ async def review_approval(
             reviewer=data.reviewer,
         )
         return ActionApprovalResponse.model_validate(approval)
+    except ActionBlockedException as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except AgentServiceException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 

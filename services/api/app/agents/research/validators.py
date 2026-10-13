@@ -79,6 +79,35 @@ def validate_and_sanitize_target_url(raw_url: str) -> str:
         if not re.match(r"^[a-zA-Z0-9.\-]+$", hostname):
             raise SSRFValidationError(f"Invalid characters in hostname: {hostname}")
 
+        # Cloud metadata domains and special local names
+        lower_host = hostname.lower()
+        if lower_host in ("metadata.google.internal", "instance-data", "metadata", "local", "internal"):
+            raise SSRFValidationError(f"Access to cloud metadata host '{hostname}' is blocked")
+
+        # Robust DNS address resolution check: resolve hostname and verify resolved IPs
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for family, socktype, proto, canonname, sockaddr in addr_info:
+                resolved_ip_str = sockaddr[0]
+                resolved_ip = ipaddress.ip_address(resolved_ip_str)
+                if (
+                    resolved_ip.is_private
+                    or resolved_ip.is_loopback
+                    or resolved_ip.is_link_local
+                    or resolved_ip.is_reserved
+                    or resolved_ip.is_multicast
+                ):
+                    raise SSRFValidationError(
+                        f"Hostname '{hostname}' resolves to prohibited private address {resolved_ip}"
+                    )
+                # Explicit check for cloud metadata IP 169.254.169.254
+                if str(resolved_ip) == "169.254.169.254":
+                    raise SSRFValidationError(f"Hostname '{hostname}' resolves to cloud metadata IP")
+        except socket.gaierror:
+            # If domain cannot be resolved by DNS (e.g. offline unit testing), block suspicious local/internal domains
+            if any(keyword in lower_host for keyword in ("localhost", "internal", "localdomain", "corp")):
+                raise SSRFValidationError(f"Unresolvable local or internal host '{hostname}' is blocked")
+
     return url
 
 

@@ -9,6 +9,7 @@ from services.api.app.api.v1.routes import (
     outreach,
     research,
     conversations,
+    prospecting,
 )
 
 api_v1_router = APIRouter()
@@ -25,6 +26,9 @@ api_v1_router.include_router(leads.router)
 api_v1_router.include_router(agent.router)
 api_v1_router.include_router(browser_gateway.router)
 
+# Autonomous Prospecting Agent
+api_v1_router.include_router(prospecting.router)
+
 # Website Intelligence & Deep Research
 api_v1_router.include_router(research.router)
 
@@ -33,4 +37,5 @@ api_v1_router.include_router(outreach.router)
 
 # Conversation Intelligence & Reply Agent
 api_v1_router.include_router(conversations.router)
+
 

@@ -19,7 +19,7 @@
 
     <!-- Content Sections -->
     <main class="content">
-      <!-- Pairing Section (Shown if disconnected) -->
+      <!-- Pairing Section (Shown ONLY if no active/saved session exists) -->
       <section id="pairingSection" class="card">
         <h3>Connect Chrome Agent</h3>
         <p class="subtitle">Enter the pairing code generated in your TechVerse OS dashboard:</p>
@@ -30,7 +30,7 @@
         <div id="pairError" class="error-text hidden"></div>
       </section>
 
-      <!-- Active Session Section (Shown if connected) -->
+      <!-- Active Session Section (Shown if session exists) -->
       <section id="sessionSection" class="card hidden">
         <div class="section-row">
           <span class="label">Session ID:</span>
@@ -38,7 +38,33 @@
         </div>
         <div class="section-row">
           <span class="label">State:</span>
-          <span id="stateVal" class="badge">RUNNING</span>
+          <span id="stateVal" class="badge badge-info">IDLE</span>
+        </div>
+
+        <!-- Reconnect action if session is currently offline/reconnecting -->
+        <div id="reconnectBanner" class="hidden" style="margin-top: 8px; margin-bottom: 8px;">
+          <button id="reconnectBtn" class="btn btn-primary" style="width: 100%;">⚡ Reconnect to Gateway</button>
+        </div>
+
+        <!-- Task Control Section -->
+        <div class="task-control-box">
+          <div style="font-weight: 600; font-size: 12px; color: #93C5FD;">Autonomous Task Control</div>
+          <button id="startAutoBtn" class="btn btn-primary" style="width: 100%; margin-top: 6px; margin-bottom: 6px;">⚡ Start Autonomous Prospecting</button>
+          <input type="text" id="taskUrlInput" class="text-input" placeholder="Target URL (Optional - leave empty for auto)" style="text-transform: none; font-family: sans-serif;" />
+          <select id="taskSourceSelect" class="select-input">
+            <option value="WEBSITE">Website (General)</option>
+            <option value="REDDIT">Reddit Community</option>
+            <option value="THREADS">Threads</option>
+            <option value="LINKEDIN">LinkedIn</option>
+            <option value="INSTAGRAM">Instagram</option>
+            <option value="WEB_SEARCH">Web Search</option>
+          </select>
+          <input type="text" id="taskServiceInput" class="text-input" placeholder="Target Service (Optional - auto inferred)" style="text-transform: none; font-family: sans-serif;" />
+          <div style="display: flex; gap: 6px;">
+            <button id="startTaskBtn" class="btn btn-success" style="flex: 1;">▶ Start Task</button>
+            <button id="stopTaskBtn" class="btn btn-danger" style="flex: 1;">⏹ Stop</button>
+          </div>
+          <div id="taskStatusText" class="subtitle" style="margin-bottom: 0; font-size: 11px;">Task idle</div>
         </div>
 
         <div class="action-buttons">

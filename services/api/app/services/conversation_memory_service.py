@@ -47,7 +47,12 @@ class ConversationMemoryService:
             if lead.contact_id:
                 cnt = await self.contact_repo.get_by_id(organization_id, lead.contact_id)
                 if cnt:
-                    contact_handle = cnt.handle or cnt.email or cnt.full_name
+                    contact_handle = (
+                        cnt.instagram_username
+                        or cnt.reddit_username
+                        or cnt.email
+                        or cnt.full_name
+                    )
 
         # Signals
         signals = await self.signal_repo.list_by_lead(thread.lead_id)
@@ -59,9 +64,15 @@ class ConversationMemoryService:
         if research:
             if research.recommendations:
                 website_findings.extend(research.recommendations[:2])
-            elif research.detected_technologies:
-                tech_str = ", ".join(research.detected_technologies[:3])
-                website_findings.append(f"Detected technologies: {tech_str}")
+            elif research.technology_stack:
+                tech_names = [
+                    t if isinstance(t, str) else (t.get("technology") or t.get("name"))
+                    for t in research.technology_stack
+                    if (isinstance(t, str) and t) or (isinstance(t, dict) and (t.get("technology") or t.get("name")))
+                ]
+                if tech_names:
+                    tech_str = ", ".join(tech_names[:3])
+                    website_findings.append(f"Detected technologies: {tech_str}")
 
         # Past outreach body
         past_drafts = await self.outreach_repo.list_drafts_by_lead(organization_id, thread.lead_id)

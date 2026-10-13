@@ -1,0 +1,58 @@
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+
+class ProspectingJobStatus(str, Enum):
+    CREATED = "CREATED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    WAITING_FOR_USER = "WAITING_FOR_USER"
+    BLOCKED = "BLOCKED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class ProspectingJobEndReason(str, Enum):
+    OBJECTIVE_MET = "OBJECTIVE_MET"
+    PAGE_EXHAUSTED = "PAGE_EXHAUSTED"
+    BUDGET_PAGES = "BUDGET_PAGES"
+    BUDGET_TIME = "BUDGET_TIME"
+    NO_QUALIFIED_FOUND = "NO_QUALIFIED_FOUND"
+    BLOCKED = "BLOCKED"
+    BROWSER_DISCONNECTED = "BROWSER_DISCONNECTED"
+    CANCELLED = "CANCELLED"
+    FAILED = "FAILED"
+
+
+class CandidateStatus(str, Enum):
+    DISCOVERED = "DISCOVERED"
+    RESEARCHING = "RESEARCHING"
+    QUALIFIED = "QUALIFIED"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+    DISQUALIFIED = "DISQUALIFIED"
+    DUPLICATE = "DUPLICATE"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"
+    CONVERTED_TO_LEAD = "CONVERTED_TO_LEAD"
+
+
+class ProspectingSourceType(str, Enum):
+    INSTAGRAM = "INSTAGRAM"
+    REDDIT = "REDDIT"
+    THREADS = "THREADS"
+    WEBSITE = "WEBSITE"
+    WEB_SEARCH = "WEB_SEARCH"
+    LINKEDIN = "LINKEDIN"
+    GOOGLE_MAPS = "GOOGLE_MAPS"
+    UPWORK = "UPWORK"
+
+
+class QualificationLevel(str, Enum):
+    DISCOVERED = "DISCOVERED"
+    PROSPECT = "PROSPECT"
+    QUALIFIED_LEAD = "QUALIFIED_LEAD"
+    HOT_LEAD = "HOT_LEAD"
